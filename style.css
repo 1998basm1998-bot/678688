@@ -130,3 +130,45 @@ body.dark-mode .nav-btn.active { color: #a29bfe; }
     @page { size: A4 landscape; margin: 10mm; }
     * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
 }
+
+/* التعديل الثالث: تصغير الحقول لتظهر في شاشة واحدة */
+#add-student-modal .modal-content,
+#add-sibling-modal .modal-content,
+#student-profile-modal .modal-content {
+    padding: 10px 15px !important;
+    max-height: 95vh;
+    overflow-y: auto;
+}
+#add-student-modal .glass-input,
+#add-sibling-modal .glass-input,
+#student-profile-modal .glass-input {
+    margin-bottom: 5px !important;
+    padding: 5px 8px !important;
+    height: 32px !important;
+    font-size: 13px !important;
+}
+#add-student-modal .grid-2,
+#student-profile-modal .grid-2,
+#student-profile-modal .grid-3 {
+    gap: 5px !important;
+    margin-top: 5px !important;
+    margin-bottom: 5px !important;
+}
+#add-student-modal h3, #add-student-modal h4,
+#add-sibling-modal h3,
+#student-profile-modal h2, #student-profile-modal h4 {
+    margin-top: 5px !important;
+    margin-bottom: 5px !important;
+    font-size: 15px !important;
+}
+#student-profile-modal .glass.p-2 {
+    padding: 6px !important;
+}
+.modal-content .btn-3d { margin-bottom: 5px !important; padding: 6px !important; font-size: 13px !important; }
+#siblings-temp-list, #payments-history {
+    max-height: 80px !important;
+    overflow-y: auto !important;
+    margin-bottom: 5px !important;
+}
+#prof-details { margin-top: 2px !important; font-size: 12px !important; }
+#prof-name { font-size: 18px !important; margin-bottom: 0 !important; }
