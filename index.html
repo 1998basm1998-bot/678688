@@ -18,10 +18,10 @@
     <div id="setup-modal" class="modal active">
         <div class="modal-content glass text-center">
             <h2><i class="fas fa-school"></i> أهلاً بك في النظام</h2>
-            <p>يرجى إضافة بيانات المدرسة للبدء</p>
+            <p>يرجى إدخال بيانات المدرسة للبدء</p>
             <input type="text" id="setup-school-name" class="glass-input" placeholder="اسم المدرسة (مثال: ثانوية هبة الرحمن)">
             <input type="date" id="setup-school-date" class="glass-input">
-            <button class="btn-3d success w-100 mt-2" onclick="saveSetup()"><i class="fas fa-sign-in-alt"></i> الدخول للنظام</button>
+            <button type="button" class="btn-3d success w-100 mt-2" onclick="saveSetup()"><i class="fas fa-sign-in-alt"></i> الدخول للنظام</button>
         </div>
     </div>
 
@@ -46,7 +46,7 @@
 
         <div id="tab-students" class="tab-content">
             <div class="glass p-3 mb-3">
-                <button class="btn-3d success w-100 mb-2" onclick="openAddStudentModal()"><i class="fas fa-user-plus"></i> إضافة طالب جديد</button>
+                <button type="button" class="btn-3d success w-100 mb-2" onclick="openAddStudentModal()"><i class="fas fa-user-plus"></i> إضافة طالب جديد</button>
                 <div style="position: relative;">
                     <i class="fas fa-search search-icon"></i>
                     <input type="text" id="search-student" class="glass-input m-0 pr-40" placeholder="ابحث عن طالب بالاسم أو القيد..." onkeyup="searchStudent()">
@@ -59,7 +59,7 @@
             <div class="glass p-3 mb-3 pb-x">
                 <div class="flex-between mb-2">
                     <h3><i class="fas fa-users-cog"></i> الكادر والرواتب</h3>
-                    <button class="btn-3d success btn-small m-0" onclick="openAddStaffModal()"><i class="fas fa-plus"></i> إضافة موظف</button>
+                    <button type="button" class="btn-3d success btn-small m-0" onclick="openAddStaffModal()"><i class="fas fa-plus"></i> إضافة موظف</button>
                 </div>
                 <div id="staff-list" class="list-container mt-2"></div>
             </div>
@@ -69,7 +69,7 @@
             <div class="glass p-3 mb-3 pb-x">
                 <div class="flex-between mb-2">
                     <h3><i class="fas fa-shopping-cart"></i> المصروفات العامة</h3>
-                    <button class="btn-3d success btn-small m-0" onclick="openAddExpenseModal()"><i class="fas fa-plus"></i> إضافة مصروف</button>
+                    <button type="button" class="btn-3d success btn-small m-0" onclick="openAddExpenseModal()"><i class="fas fa-plus"></i> إضافة مصروف</button>
                 </div>
                 <div id="expenses-list" class="list-container mt-2"></div>
             </div>
@@ -96,7 +96,7 @@
                     <select id="rep-class" class="glass-input m-0" onchange="updateRepSectionDropdown()"></select>
                     <select id="rep-section" class="glass-input m-0" onchange="generateReport()"><option value="">اختر الشعبة</option></select>
                 </div>
-                <button class="btn-3d success w-100 mb-2" onclick="exportReportExcel()"><i class="fas fa-download"></i> تصدير إكسل</button>
+                <button type="button" class="btn-3d success w-100 mb-2" onclick="exportReportExcel()"><i class="fas fa-download"></i> تصدير إكسل</button>
                 <div id="report-list" class="list-container"></div>
             </div>
         </div>
@@ -104,18 +104,18 @@
         <div id="tab-settings" class="tab-content">
             <div class="glass p-3 mb-3 text-center flex-between">
                 <h3 id="display-school-name" style="margin: 0;"></h3>
-                <button class="btn-3d" onclick="toggleTheme()"><i class="fas fa-moon"></i></button>
+                <button type="button" class="btn-3d" onclick="toggleTheme()"><i class="fas fa-moon"></i></button>
             </div>
             <div class="glass p-3 mb-3">
                 <h3><i class="fas fa-edit"></i> تعديل بيانات المدرسة</h3>
                 <input type="text" id="edit-school-name" class="glass-input" placeholder="اسم المدرسة">
                 <input type="date" id="edit-school-date" class="glass-input">
-                <button class="btn-3d success w-100 mt-1" onclick="updateSchool()"><i class="fas fa-save"></i> حفظ</button>
+                <button type="button" class="btn-3d success w-100 mt-1" onclick="updateSchool()"><i class="fas fa-save"></i> حفظ التعديل</button>
             </div>
             <div class="glass p-3 mb-3 pb-x">
                 <div class="flex-between mb-3">
                     <h3 class="m-0"><i class="fas fa-map-marked-alt"></i> المناطق وخطوط النقل</h3>
-                    <button class="btn-3d warning btn-small m-0" onclick="showModal('regions-modal')"><i class="fas fa-plus"></i> إضافة منطقة</button>
+                    <button type="button" class="btn-3d warning btn-small m-0" onclick="showModal('regions-modal')"><i class="fas fa-plus"></i> إضافة منطقة</button>
                 </div>
                 <hr style="opacity:0.2; margin-bottom:15px;">
                 <div class="flex-between mb-2">
@@ -123,20 +123,20 @@
                 </div>
                 <div class="flex-row mt-2">
                     <input type="text" id="new-class-name" class="glass-input m-0" placeholder="اسم الصف الجديد...">
-                    <button class="btn-3d success" onclick="addClass()"><i class="fas fa-plus"></i></button>
+                    <button type="button" class="btn-3d success" onclick="addClass()"><i class="fas fa-plus"></i></button>
                 </div>
                 <div id="classes-list" class="mt-2 list-container"></div>
             </div>
         </div>
 
         <div class="bottom-nav glass" id="bottom-nav-container">
-            <button class="nav-btn active" onclick="switchTab('dashboard')" id="nav-dashboard"><i class="fas fa-home"></i><span>الرئيسية</span></button>
-            <button class="nav-btn" onclick="switchTab('students')" id="nav-students"><i class="fas fa-user-graduate"></i><span>الطلاب</span></button>
-            <button class="nav-btn" onclick="switchTab('staff')" id="nav-staff"><i class="fas fa-user-tie"></i><span>الكادر</span></button>
-            <button class="nav-btn" onclick="switchTab('expenses')" id="nav-expenses"><i class="fas fa-shopping-cart"></i><span>المصروفات</span></button>
-            <button class="nav-btn" onclick="switchTab('daily')" id="nav-daily"><i class="fas fa-calendar-day"></i><span>اليومية</span></button>
-            <button class="nav-btn" onclick="switchTab('reports')" id="nav-reports"><i class="fas fa-file-alt"></i><span>التقارير</span></button>
-            <button class="nav-btn" onclick="switchTab('settings')" id="nav-settings"><i class="fas fa-cog"></i><span>الإعدادات</span></button>
+            <button type="button" class="nav-btn active" onclick="switchTab('dashboard')" id="nav-dashboard"><i class="fas fa-home"></i><span>الرئيسية</span></button>
+            <button type="button" class="nav-btn" onclick="switchTab('students')" id="nav-students"><i class="fas fa-user-graduate"></i><span>الطلاب</span></button>
+            <button type="button" class="nav-btn" onclick="switchTab('staff')" id="nav-staff"><i class="fas fa-user-tie"></i><span>الكادر</span></button>
+            <button type="button" class="nav-btn" onclick="switchTab('expenses')" id="nav-expenses"><i class="fas fa-shopping-cart"></i><span>المصروفات</span></button>
+            <button type="button" class="nav-btn" onclick="switchTab('daily')" id="nav-daily"><i class="fas fa-calendar-day"></i><span>اليومية</span></button>
+            <button type="button" class="nav-btn" onclick="switchTab('reports')" id="nav-reports"><i class="fas fa-file-alt"></i><span>التقارير</span></button>
+            <button type="button" class="nav-btn" onclick="switchTab('settings')" id="nav-settings"><i class="fas fa-cog"></i><span>الإعدادات</span></button>
         </div>
     </div>
 
@@ -149,7 +149,7 @@
                 <input type="text" id="reg-driver" class="glass-input" placeholder="اسم السائق">
                 <input type="text" id="reg-phone" class="glass-input" placeholder="رقم هاتف السائق">
                 <input type="text" id="reg-code" class="glass-input" placeholder="رمز الخط/المنطقة (أرقام)">
-                <button class="btn-3d success w-100 mt-1" onclick="addRegion()"><i class="fas fa-save"></i> حفظ الخط</button>
+                <button type="button" class="btn-3d success w-100 mt-1" onclick="addRegion()"><i class="fas fa-save"></i> حفظ الخط</button>
             </div>
             <div id="regions-list" class="list-container"></div>
         </div>
@@ -177,10 +177,10 @@
             </div>
             <div class="flex-between mb-1">
                 <h4><i class="fas fa-users"></i> إخوة الطالب:</h4>
-                <button class="btn-3d warning btn-small m-0" onclick="showModal('add-sibling-modal')"><i class="fas fa-plus"></i> إضافة أخ</button>
+                <button type="button" class="btn-3d warning btn-small m-0" onclick="showModal('add-sibling-modal')"><i class="fas fa-plus"></i> إضافة أخ</button>
             </div>
             <div id="siblings-temp-list" class="list-container mb-2"></div>
-            <button class="btn-3d success w-100" onclick="saveStudent()"><i class="fas fa-save"></i> حفظ بيانات الطالب</button>
+            <button type="button" class="btn-3d success w-100" onclick="saveStudent()"><i class="fas fa-save"></i> حفظ بيانات الطالب</button>
         </div>
     </div>
 
@@ -192,7 +192,7 @@
             <input type="text" id="sib-name" class="glass-input" placeholder="الاسم الثلاثي للأخ">
             <select id="sib-class" class="glass-input" onchange="updateSibSectionDropdown()"></select>
             <select id="sib-section" class="glass-input"><option value="">اختر الشعبة</option></select>
-            <button class="btn-3d success w-100 mt-2" onclick="saveSiblingTemp()"><i class="fas fa-check"></i> تأكيد وإضافة</button>
+            <button type="button" class="btn-3d success w-100 mt-2" onclick="saveSiblingTemp()"><i class="fas fa-check"></i> تأكيد وإضافة</button>
         </div>
     </div>
 
@@ -214,14 +214,14 @@
             </div>
 
             <div class="grid-2 mb-2">
-                <button class="btn-3d success" onclick="showModal('payment-modal')"><i class="fas fa-money-bill-wave"></i> استلام قسط</button>
-                <button class="btn-3d warning" onclick="openGrades()"><i class="fas fa-star"></i> سجل الدرجات</button>
+                <button type="button" class="btn-3d success" onclick="showModal('payment-modal')"><i class="fas fa-money-bill-wave"></i> استلام قسط</button>
+                <button type="button" class="btn-3d warning" onclick="openGrades()"><i class="fas fa-star"></i> سجل الدرجات</button>
             </div>
 
             <div class="mb-2"><h4>سجل الدفعات المستلمة:</h4><div id="payments-history" class="list-container mt-1"></div></div>
 
-            <button class="btn-3d w-100 mb-1" onclick="printReceipt()"><i class="fas fa-print"></i> طباعة وصل مالي A4</button>
-            <button class="btn-3d success w-100" onclick="exportStudentExcel()"><i class="fas fa-file-excel"></i> تصدير إكسل للطالب</button>
+            <button type="button" class="btn-3d w-100 mb-1" onclick="printReceipt()"><i class="fas fa-print"></i> طباعة وصل مالي A4</button>
+            <button type="button" class="btn-3d success w-100" onclick="exportStudentExcel()"><i class="fas fa-file-excel"></i> تصدير إكسل للطالب</button>
         </div>
     </div>
 
@@ -233,7 +233,7 @@
                 <input type="date" id="pay-date" class="glass-input m-0">
                 <input type="number" id="pay-amount" class="glass-input m-0" placeholder="المبلغ المستلم">
             </div>
-            <button class="btn-3d success w-100" onclick="submitPayment()"><i class="fas fa-check"></i> حفظ وصل القبض</button>
+            <button type="button" class="btn-3d success w-100" onclick="submitPayment()"><i class="fas fa-check"></i> حفظ وصل القبض</button>
         </div>
     </div>
 
@@ -242,21 +242,21 @@
             <span class="close-btn" onclick="hideModal('grades-modal')">&times;</span>
             <div class="flex-between mb-2">
                 <h3><i class="fas fa-table"></i> سجل درجات الطالب</h3>
-                <button class="btn-3d" onclick="printGrades()"><i class="fas fa-print"></i> طباعة A4</button>
+                <button type="button" class="btn-3d" onclick="printGrades()"><i class="fas fa-print"></i> طباعة A4</button>
             </div>
             <div id="grades-table-container"></div>
-            <button class="btn-3d success w-100 mt-2" onclick="saveGrades()"><i class="fas fa-save"></i> حفظ الدرجات في السجل</button>
+            <button type="button" class="btn-3d success w-100 mt-2" onclick="saveGrades()"><i class="fas fa-save"></i> حفظ الدرجات في السجل</button>
         </div>
     </div>
 
     <div id="add-staff-modal" class="modal">
         <div class="modal-content glass">
             <span class="close-btn" onclick="hideModal('add-staff-modal')">&times;</span>
-            <h3 id="staff-modal-title"><i class="fas fa-user-tie"></i> تفاصيل الموظف / المعلم</h3>
+            <h3 id="staff-modal-title"><i class="fas fa-user-tie"></i> إضافة / تعديل موظف</h3>
             <input type="text" id="staff-name" class="glass-input mt-2" placeholder="الاسم الكامل">
             <input type="text" id="staff-role" class="glass-input" placeholder="المنصب (مثال: مدرس كيمياء، حارس)">
             <input type="number" id="staff-salary" class="glass-input" placeholder="الراتب المتفق عليه (د.ع)">
-            <button class="btn-3d success w-100" onclick="saveStaff()"><i class="fas fa-save"></i> حفظ الموظف</button>
+            <button type="button" class="btn-3d success w-100" onclick="saveStaff()"><i class="fas fa-save"></i> حفظ الموظف</button>
         </div>
     </div>
 
@@ -267,7 +267,7 @@
             <input type="text" id="exp-desc" class="glass-input mt-2" placeholder="البيان (مثال: صيانة مولدة، قرطاسية)">
             <input type="number" id="exp-amount" class="glass-input" placeholder="المبلغ المصروف (د.ع)">
             <input type="date" id="exp-date" class="glass-input">
-            <button class="btn-3d danger w-100 mt-2" onclick="saveExpense()"><i class="fas fa-save"></i> تقييد المصروف وخصمه من الصندوق</button>
+            <button type="button" class="btn-3d danger w-100 mt-2" onclick="saveExpense()"><i class="fas fa-save"></i> تقييد المصروف</button>
         </div>
     </div>
 
