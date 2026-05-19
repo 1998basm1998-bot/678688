@@ -1,7 +1,6 @@
 // ============ 1. قاعدة البيانات (Auto-Seed) لتوليد بيانات تلقائية ============
 let db;
 try {
-    // استخدمنا اسم تخزين جديد لتنظيف أي ملفات عالقة سابقة في المتصفح
     db = JSON.parse(localStorage.getItem('school_erp_final_v1'));
 } catch (e) {
     db = null;
@@ -37,6 +36,7 @@ if (!db || typeof db !== 'object') {
 }
 
 let currentStudentId = null, editingStudentId = null, tempSiblings = [], editingStaffId = null;
+let editingDirectSibMainId = null, editingDirectSibIdx = null, editingTempSibIdx = null;
 const defaultSubjects = ['العربي','الرياضيات','الإنكليزي','الإسلامية','الكيمياء','الفيزياء','الاحياء','الفنية','الرياضة','الجرائم'];
 
 // ============ 2. محرك التنبيهات 3D (SweetAlert2) ============
@@ -76,12 +76,10 @@ function saveSetup() {
         return;
     }
     
-    // حفظ البيانات
     db.schoolName = name.trim(); 
     db.schoolDate = date; 
     saveDB(); 
 
-    // إخفاء نافذة الدخول وإظهار النظام فورا بدون (location.reload)
     document.getElementById('setup-modal').classList.remove('active');
     document.getElementById('app').classList.remove('hidden');
     
@@ -97,14 +95,12 @@ function initApp() {
     document.getElementById('edit-school-name').value = db.schoolName; 
     document.getElementById('edit-school-date').value = db.schoolDate || '';
     
-    // تعيين التواريخ الافتراضية
     document.getElementById('daily-date-filter').value = todayISO;
     document.getElementById('pay-date').value = todayISO;
     document.getElementById('exp-date').value = todayISO;
 
-    // استدعاء كافة دوال الرسم
     renderClasses(); renderRegions(); renderStudents(); populateClassSelects(); updateRepSectionDropdown();
-    renderDual(); renderDaily(); renderStaff(); renderExpenses();
+    renderDual(); renderDaily(); renderStaff(); renderExpenses(); renderStatistics();
 }
 
 function updateSchool() {
@@ -115,7 +111,6 @@ function updateSchool() {
     customAlert('تم تحديث بيانات المدرسة بنجاح', 'success');
 }
 
-// نظام التبديل بين التبويبات السفلية
 function switchTab(tabId) {
     document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active-tab'));
     document.querySelectorAll('.nav-btn').forEach(el => el.classList.remove('active'));
@@ -126,13 +121,13 @@ function switchTab(tabId) {
     if(tab) tab.classList.add('active-tab'); 
     if(nav) nav.classList.add('active');
     
-    // تحديث بيانات التبويبة المطلوبة
     if(tabId === 'students') renderStudents();
     if(tabId === 'reports') updateRepSectionDropdown();
     if(tabId === 'staff') renderStaff();
     if(tabId === 'expenses') renderExpenses();
     if(tabId === 'daily') renderDaily();
     if(tabId === 'dashboard') renderDual();
+    if(tabId === 'statistics') renderStatistics();
 }
 
 function toggleTheme() { db.theme = db.theme === 'light' ? 'dark' : 'light'; applyTheme(db.theme); saveDB(); }
@@ -162,39 +157,153 @@ function updateSectionDropdown() { updateDropdown('std-class', 'std-section'); }
 function updateDropdown(cId, sId, sVal=null) { let v=document.getElementById(cId).value, sel=document.getElementById(sId); sel.innerHTML='<option value="">اختر الشعبة</option>'; let c=db.classes.find(x=>x.id==v); if(c){ sel.innerHTML+=c.sections.map(s=>`<option value="${s.id}">${s.name}</option>`).join(''); if(sVal) sel.value=sVal;} }
 function checkRegionCode() { let reg=db.regions.find(r=>r.code===document.getElementById('std-reg-code').value); document.getElementById('std-reg-name').value=reg?reg.name:''; document.getElementById('std-driver-name').value=reg?reg.driver:''; }
 
-function openAddStudentModal() { editingStudentId=null; tempSiblings=[]; renderTempSiblings(); document.getElementById('std-modal-title').innerHTML='<i class="fas fa-user-plus"></i> إضافة طالب جديد'; ['std-class','std-section','std-reg','std-name','std-phone','std-fee','std-reg-code','std-reg-name','std-driver-name'].forEach(id=>document.getElementById(id).value=''); showModal('add-student-modal'); }
-function editStudent(id) { editingStudentId=id; let s=db.students.find(x=>x.id===id); document.getElementById('std-modal-title').innerHTML='<i class="fas fa-user-edit"></i> تعديل طالب'; document.getElementById('std-class').value=s.classId; updateDropdown('std-class','std-section',s.sectionId); document.getElementById('std-reg').value=s.regId||''; document.getElementById('std-name').value=s.name; document.getElementById('std-phone').value=s.phone||''; document.getElementById('std-fee').value=s.tuition; document.getElementById('std-reg-code').value=s.regionCode||''; checkRegionCode(); tempSiblings=s.siblings?JSON.parse(JSON.stringify(s.siblings)):[]; renderTempSiblings(); showModal('add-student-modal'); }
-function saveSiblingTemp() { let n=document.getElementById('sib-name').value; if(!n)return customAlert('اسم الأخ مطلوب', 'warning'); tempSiblings.push({regId:document.getElementById('sib-reg').value, name:n, classId:document.getElementById('sib-class').value, sectionId:document.getElementById('sib-section').value}); renderTempSiblings(); hideModal('add-sibling-modal'); ['sib-reg','sib-name','sib-class','sib-section'].forEach(id=>document.getElementById(id).value=''); }
-function renderTempSiblings() { document.getElementById('siblings-temp-list').innerHTML=tempSiblings.map((s,i)=>`<div class="list-item flex-between p-2"><span><i class="fas fa-child"></i> ${s.name}</span> <button type="button" class="btn-3d danger btn-small m-0" onclick="tempSiblings.splice(${i},1); renderTempSiblings()"><i class="fas fa-trash"></i></button></div>`).join(''); }
+function openAddStudentModal() { 
+    editingStudentId=null; 
+    tempSiblings=[]; 
+    editingDirectSibMainId=null; 
+    editingDirectSibIdx=null; 
+    editingTempSibIdx=null; 
+    renderTempSiblings(); 
+    document.getElementById('std-modal-title').innerHTML='<i class="fas fa-user-plus"></i> إضافة طالب جديد'; 
+    ['std-class','std-section','std-reg','std-name','std-phone','std-fee','std-reg-code','std-reg-name','std-driver-name'].forEach(id=>document.getElementById(id).value=''); 
+    showModal('add-student-modal'); 
+}
+
+function editStudent(id) { 
+    editingStudentId=id; 
+    editingDirectSibMainId=null; 
+    editingDirectSibIdx=null; 
+    editingTempSibIdx=null; 
+    let s=db.students.find(x=>x.id===id); 
+    document.getElementById('std-modal-title').innerHTML='<i class="fas fa-user-edit"></i> تعديل طالب'; 
+    document.getElementById('std-class').value=s.classId; 
+    updateDropdown('std-class','std-section',s.sectionId); 
+    document.getElementById('std-reg').value=s.regId||''; 
+    document.getElementById('std-name').value=s.name; 
+    document.getElementById('std-phone').value=s.phone||''; 
+    document.getElementById('std-fee').value=s.tuition; 
+    document.getElementById('std-reg-code').value=s.regionCode||''; 
+    checkRegionCode(); 
+    tempSiblings=s.siblings?JSON.parse(JSON.stringify(s.siblings)):[]; 
+    renderTempSiblings(); 
+    showModal('add-student-modal'); 
+}
+
+function openAddSiblingModal() {
+    editingDirectSibMainId = null;
+    editingDirectSibIdx = null;
+    editingTempSibIdx = null;
+    ['sib-reg','sib-name','sib-class','sib-section'].forEach(id=>document.getElementById(id).value=''); 
+    showModal('add-sibling-modal');
+}
+
+function editTempSibling(idx) {
+    editingTempSibIdx = idx;
+    editingDirectSibMainId = null;
+    editingDirectSibIdx = null;
+    let sib = tempSiblings[idx];
+    document.getElementById('sib-reg').value = sib.regId || '';
+    document.getElementById('sib-name').value = sib.name;
+    document.getElementById('sib-class').value = sib.classId;
+    updateDropdown('sib-class', 'sib-section', sib.sectionId);
+    showModal('add-sibling-modal');
+}
+
+function editSiblingDirect(mainId, sibIdx) {
+    editingDirectSibMainId = mainId;
+    editingDirectSibIdx = sibIdx;
+    editingTempSibIdx = null;
+    let s = db.students.find(x => x.id === mainId);
+    let sib = s.siblings[sibIdx];
+    document.getElementById('sib-reg').value = sib.regId || '';
+    document.getElementById('sib-name').value = sib.name;
+    document.getElementById('sib-class').value = sib.classId;
+    updateDropdown('sib-class', 'sib-section', sib.sectionId);
+    showModal('add-sibling-modal');
+}
+
+function deleteSiblingDirect(mainId, sibIdx) {
+    customConfirm("تأكيد حذف الأخ نهائياً من النظام؟", r => {
+        if(r) {
+            let s = db.students.find(x => x.id === mainId);
+            s.siblings.splice(sibIdx, 1);
+            saveDB();
+            renderStudents();
+            renderDual();
+            if(typeof renderStatistics === 'function') renderStatistics();
+        }
+    });
+}
+
+function saveSiblingTemp() { 
+    let n=document.getElementById('sib-name').value; 
+    if(!n) return customAlert('اسم الأخ مطلوب', 'warning'); 
+    
+    let sibObj = {
+        regId: document.getElementById('sib-reg').value, 
+        name: n, 
+        classId: document.getElementById('sib-class').value, 
+        sectionId: document.getElementById('sib-section').value
+    };
+
+    if (editingDirectSibMainId !== null && editingDirectSibIdx !== null) {
+        let s = db.students.find(x => x.id === editingDirectSibMainId);
+        s.siblings[editingDirectSibIdx] = sibObj;
+        saveDB();
+        renderStudents();
+        if(typeof renderStatistics === 'function') renderStatistics();
+        hideModal('add-sibling-modal');
+        if(typeof Swal !== 'undefined') Swal.fire({toast:true,position:'top-end',icon:'success',title:'تم التعديل',showConfirmButton:false,timer:1500});
+        editingDirectSibMainId = null;
+        editingDirectSibIdx = null;
+    } else if (editingTempSibIdx !== null) {
+        tempSiblings[editingTempSibIdx] = sibObj;
+        renderTempSiblings();
+        hideModal('add-sibling-modal');
+        editingTempSibIdx = null;
+    } else {
+        tempSiblings.push(sibObj); 
+        renderTempSiblings(); 
+        hideModal('add-sibling-modal'); 
+    }
+    ['sib-reg','sib-name','sib-class','sib-section'].forEach(id=>document.getElementById(id).value=''); 
+}
+
+function renderTempSiblings() { 
+    document.getElementById('siblings-temp-list').innerHTML=tempSiblings.map((s,i)=>`<div class="list-item flex-between p-2"><span><i class="fas fa-child"></i> ${s.name}</span> <div class="flex-row"><button type="button" class="btn-3d warning btn-small m-0" onclick="editTempSibling(${i})"><i class="fas fa-pen"></i></button><button type="button" class="btn-3d danger btn-small m-0" onclick="tempSiblings.splice(${i},1); renderTempSiblings()"><i class="fas fa-trash"></i></button></div></div>`).join(''); 
+}
 
 function saveStudent() {
     let n=document.getElementById('std-name').value; if(!n) return customAlert('الاسم الثلاثي للطالب مطلوب','error');
     let d = { classId:document.getElementById('std-class').value, sectionId:document.getElementById('std-section').value, regId:document.getElementById('std-reg').value, name:n, phone:document.getElementById('std-phone').value, tuition:parseFloat(document.getElementById('std-fee').value)||0, regionCode:document.getElementById('std-reg-code').value, siblings:[...tempSiblings] };
     if(editingStudentId){ let idx=db.students.findIndex(x=>x.id===editingStudentId); d.id=db.students[idx].id; d.payments=db.students[idx].payments; d.grades=db.students[idx].grades; db.students[idx]=d; if(typeof Swal !== 'undefined') Swal.fire({toast:true,position:'top-end',icon:'success',title:'تم التعديل',showConfirmButton:false,timer:1500}); } 
     else { d.id=Date.now(); d.payments=[]; d.grades={}; db.students.push(d); if(typeof Swal !== 'undefined') Swal.fire({toast:true,position:'top-end',icon:'success',title:'تم الإضافة',showConfirmButton:false,timer:1500}); }
-    saveDB(); hideModal('add-student-modal'); renderStudents(); renderDual();
+    saveDB(); hideModal('add-student-modal'); renderStudents(); renderDual(); if(typeof renderStatistics === 'function') renderStatistics();
 }
 
 function searchStudent() { renderStudents(document.getElementById('search-student').value); }
+
 function renderStudents(filter="") {
     let html='';
     db.students.forEach(s=>{
         let matchM=s.name.includes(filter) || (s.regId && s.regId.includes(filter)); let matchS=(s.siblings||[]).find(sib=>sib.name.includes(filter));
         if(matchM || (filter!=="" && matchS)) {
             let cls=db.classes.find(c=>c.id==s.classId), paid=s.payments.reduce((sum,p)=>sum+p.amount,0);
-            html+=`<div class="list-item flex-between" style="cursor:pointer;" onclick="openProfile(${s.id})"><div><strong><i class="fas fa-user-graduate text-primary"></i> ${s.name}</strong><br><small>الصف: ${cls?cls.name:'-'} | ذمة: <span style="color:#e74c3c">${(s.tuition-paid).toLocaleString()}</span></small></div><div class="flex-row"><button type="button" class="btn-3d warning btn-small m-0" onclick="event.stopPropagation(); editStudent(${s.id})"><i class="fas fa-pen"></i></button><button type="button" class="btn-3d danger btn-small m-0" onclick="event.stopPropagation(); deleteStudent(${s.id})"><i class="fas fa-trash"></i></button></div></div>`;
+            html+=`<div class="list-item flex-between" style="cursor:pointer;" onclick="openProfile(${s.id})"><div><strong><i class="fas fa-user-graduate text-primary"></i> ${s.name}</strong><br><small>الصف: ${cls?cls.name:'-'} | ذمة: <span style="color:#e74c3c">${(s.tuition-paid).toLocaleString()}</span></small></div><div class="flex-row"><button type="button" class="btn-3d btn-small m-0" style="background:#a777e3; color:white;" onclick="event.stopPropagation(); openProfile(${s.id})"><i class="fas fa-folder-open"></i> الحساب</button><button type="button" class="btn-3d warning btn-small m-0" onclick="event.stopPropagation(); editStudent(${s.id})"><i class="fas fa-pen"></i></button><button type="button" class="btn-3d danger btn-small m-0" onclick="event.stopPropagation(); deleteStudent(${s.id})"><i class="fas fa-trash"></i></button></div></div>`;
         }
         if(filter==="" || matchM || matchS){
-            (s.siblings||[]).forEach(sib=>{
+            (s.siblings||[]).forEach((sib, sibIdx)=>{
                 if(filter==="" || sib.name.includes(filter) || matchM){
                     let sc=db.classes.find(c=>c.id==sib.classId);
-                    html+=`<div class="list-item flex-between" style="cursor:pointer; background:rgba(0,0,0,0.05); border-right:4px solid #a777e3;" onclick="openProfile(${s.id})"><div><strong><i class="fas fa-child"></i> ${sib.name}</strong> <small style="color:#a777e3;">(أخو ${s.name})</small><br><small>الصف: ${sc?sc.name:''}</small></div><button type="button" class="btn-3d btn-small m-0" style="background:#a777e3;" onclick="event.stopPropagation(); openProfile(${s.id})"><i class="fas fa-folder-open"></i> الحساب</button></div>`;
+                    let sSec=sc?sc.sections.find(x=>x.id==sib.sectionId):null;
+                    html+=`<div class="list-item flex-between" style="cursor:pointer; background:rgba(0,0,0,0.05); border-right:4px solid #a777e3;" onclick="openProfile(${s.id})"><div><strong><i class="fas fa-child"></i> ${sib.name}</strong> <small style="color:#a777e3;">(أخو ${s.name})</small><br><small>الصف: ${sc?sc.name:'-'} | الشعبة: ${sSec?sSec.name:'-'}</small></div><div class="flex-row"><button type="button" class="btn-3d warning btn-small m-0" onclick="event.stopPropagation(); editSiblingDirect(${s.id}, ${sibIdx})"><i class="fas fa-pen"></i></button><button type="button" class="btn-3d danger btn-small m-0" onclick="event.stopPropagation(); deleteSiblingDirect(${s.id}, ${sibIdx})"><i class="fas fa-trash"></i></button></div></div>`;
                 }
             });
         }
     }); document.getElementById('students-list').innerHTML=html || '<div class="text-center mt-3">لا يوجد طلاب</div>';
 }
-function deleteStudent(id) { customConfirm("حذف الطالب نهائياً من النظام (مع كافة سجلاته)؟", r=>{ if(r){db.students=db.students.filter(s=>s.id!==id); saveDB(); renderStudents(); renderDual();} }); }
+
+function deleteStudent(id) { customConfirm("حذف الطالب نهائياً من النظام (مع كافة سجلاته)؟", r=>{ if(r){db.students=db.students.filter(s=>s.id!==id); saveDB(); renderStudents(); renderDual(); if(typeof renderStatistics === 'function') renderStatistics();} }); }
 
 // ============ 6. ملف الطالب المالي والدرجات ============
 function openProfile(id) {
@@ -267,7 +376,57 @@ function renderDual() {
     let net = col - sal - exs; let netEl = document.getElementById('dash-net'); netEl.innerText = net.toLocaleString(); netEl.style.color = net>=0 ? '#2ecc71' : '#e74c3c';
 }
 
-// ============ 10. التقارير والطباعة ============
+// ============ 10. إحصائيات النظام ============
+function renderStatistics() {
+    if(!document.getElementById('tab-statistics')) return; 
+    let totalStudents = 0; let totalSections = 0; let classStats = {};
+    
+    db.classes.forEach(c => {
+        totalSections += c.sections.length;
+        classStats[c.id] = { name: c.name, totalStudents: 0, sections: {} };
+        c.sections.forEach(s => { classStats[c.id].sections[s.id] = { name: s.name, count: 0 }; });
+    });
+    
+    db.students.forEach(s => {
+        totalStudents++;
+        if (classStats[s.classId]) {
+            classStats[s.classId].totalStudents++;
+            if (classStats[s.classId].sections[s.sectionId]) classStats[s.classId].sections[s.sectionId].count++;
+        }
+        (s.siblings || []).forEach(sib => {
+            totalStudents++;
+            if (classStats[sib.classId]) {
+                classStats[sib.classId].totalStudents++;
+                if (classStats[sib.classId].sections[sib.sectionId]) classStats[sib.classId].sections[sib.sectionId].count++;
+            }
+        });
+    });
+    
+    document.getElementById('stat-total-students').innerText = totalStudents;
+    document.getElementById('stat-total-sections').innerText = totalSections;
+    
+    let html = '';
+    db.classes.forEach(c => {
+        let cStat = classStats[c.id];
+        let sectionsHtml = c.sections.map(sec => {
+            let count = cStat.sections[sec.id].count;
+            return `<div class="list-item flex-between p-2 mt-1" style="background:rgba(0,0,0,0.02); font-size:14px;"><span>شعبة ${sec.name}</span> <b style="color:#8e44ad;">${count} طالب</b></div>`;
+        }).join('');
+        
+        let numSections = c.sections.length;
+        html += `<div class="list-item mb-2" style="border-right: 4px solid #3498db; background: rgba(255, 255, 255, 0.4);">
+            <div class="flex-between mb-1">
+                <strong style="color: #2c3e50; font-size: 16px;"><i class="fas fa-layer-group"></i> ${c.name} (${numSections} شعب)</strong>
+                <span class="glass p-1" style="background:#2ecc71; color:white; border:none; font-size:13px;">المجموع: ${cStat.totalStudents} طالب</span>
+            </div>
+            <div>${sectionsHtml || '<div class="text-center" style="font-size:13px;">لا توجد شعب</div>'}</div>
+        </div>`;
+    });
+    
+    document.getElementById('statistics-list').innerHTML = html || '<div class="text-center">لا توجد صفوف</div>';
+}
+
+// ============ 11. التقارير والطباعة ============
 function generateReport() { let cId=document.getElementById('rep-class').value, sId=document.getElementById('rep-section').value; if(!cId||!sId){document.getElementById('report-list').innerHTML='';return;} let f=db.students.filter(s=>s.classId==cId && s.sectionId==sId).map(s=>({...s, isSib:false})); db.students.forEach(m=>{ (m.siblings||[]).forEach(sib=>{ if(sib.classId==cId && sib.sectionId==sId) f.push({name:sib.name, isSib:true, mName:m.name}); }); }); f.sort((a,b)=>a.name.localeCompare(b.name,'ar')); document.getElementById('report-list').innerHTML=f.map((s,i)=>`<div class="list-item"><b>${i+1}.</b> ${s.name} ${s.isSib?`<small style="color:red;">(أخ لـ ${s.mName})</small>`:''}</div>`).join(''); }
 
 function exportReportExcel() { 
