@@ -101,6 +101,18 @@
             </div>
         </div>
 
+        <div id="tab-statistics" class="tab-content text-center pb-x">
+            <div class="glass p-3 mt-3">
+                <h2><i class="fas fa-chart-pie"></i> إحصائيات الطلاب والشعب</h2>
+                <div class="grid-2 mt-2">
+                    <div class="glass p-2">إجمالي الطلاب<br><b id="stat-total-students" style="color:#2ecc71; font-size:24px;">0</b></div>
+                    <div class="glass p-2">إجمالي الشعب<br><b id="stat-total-sections" style="color:#3498db; font-size:24px;">0</b></div>
+                </div>
+                <h4 class="mt-3 text-right">تفاصيل الصفوف والشعب:</h4>
+                <div id="statistics-list" class="list-container text-right mt-1"></div>
+            </div>
+        </div>
+
         <div id="tab-settings" class="tab-content">
             <div class="glass p-3 mb-3 text-center flex-between">
                 <h3 id="display-school-name" style="margin: 0;"></h3>
@@ -136,6 +148,7 @@
             <button type="button" class="nav-btn" onclick="switchTab('expenses')" id="nav-expenses"><i class="fas fa-shopping-cart"></i><span>المصروفات</span></button>
             <button type="button" class="nav-btn" onclick="switchTab('daily')" id="nav-daily"><i class="fas fa-calendar-day"></i><span>اليومية</span></button>
             <button type="button" class="nav-btn" onclick="switchTab('reports')" id="nav-reports"><i class="fas fa-file-alt"></i><span>التقارير</span></button>
+            <button type="button" class="nav-btn" onclick="switchTab('statistics')" id="nav-statistics"><i class="fas fa-chart-pie"></i><span>الإحصائيات</span></button>
             <button type="button" class="nav-btn" onclick="switchTab('settings')" id="nav-settings"><i class="fas fa-cog"></i><span>الإعدادات</span></button>
         </div>
     </div>
@@ -177,7 +190,7 @@
             </div>
             <div class="flex-between mb-1">
                 <h4><i class="fas fa-users"></i> إخوة الطالب:</h4>
-                <button type="button" class="btn-3d warning btn-small m-0" onclick="showModal('add-sibling-modal')"><i class="fas fa-plus"></i> إضافة أخ</button>
+                <button type="button" class="btn-3d warning btn-small m-0" onclick="openAddSiblingModal()"><i class="fas fa-plus"></i> إضافة أخ</button>
             </div>
             <div id="siblings-temp-list" class="list-container mb-2"></div>
             <button type="button" class="btn-3d success w-100" onclick="saveStudent()"><i class="fas fa-save"></i> حفظ بيانات الطالب</button>
