@@ -9,9 +9,12 @@ try {
 let dObj = new Date();
 let todayISO = dObj.getFullYear() + '-' + String(dObj.getMonth() + 1).padStart(2, '0') + '-' + String(dObj.getDate()).padStart(2, '0');
 
+const defaultSubjects = ['العربي','الرياضيات','الإنكليزي','الإسلامية','الكيمياء','الفيزياء','الاحياء','الفنية','الرياضة'];
+
 if (!db || typeof db !== 'object') {
     db = {
         schoolName: '', schoolDate: '', theme: 'light',
+        settings: { subjects: [...defaultSubjects] },
         classes: [
             { id: 1, name: 'الأول الابتدائي', sections: [{id: 11, name: 'أ'}, {id: 12, name: 'ب'}] },
             { id: 2, name: 'الثاني الابتدائي', sections: [{id: 21, name: 'أ'}] }
@@ -22,11 +25,12 @@ if (!db || typeof db !== 'object') {
         ],
         students: [
             { id: 1001, classId: 1, sectionId: 11, regId: '1055', name: 'علي حسين كاظم', phone: '07711111111', tuition: 1500000, regionCode: '101', payments: [{amount: 500000, date: todayISO}], grades: {}, siblings: [
-                { regId: '1056', name: 'محمد حسين كاظم', classId: 2, sectionId: 21 }
+                { regId: '1056', name: 'محمد حسين كاظم', classId: 2, sectionId: 21, fee: 1000000 }
             ]}
         ],
         staff: [
-            { id: 1, name: 'ياسر محمود', role: 'مدرس لغة عربية', salary: 600000, payments: [{amount: 150000, date: todayISO}] }
+            { id: 1, name: 'ياسر محمود', role: 'مدرس لغة عربية', isTeacher: true, hiringYear: 2020, salary: 0, payments: [{amount: 150000, date: todayISO}] },
+            { id: 2, name: 'سمير عباس', role: 'مدير', isTeacher: false, salary: 800000, payments: [] }
         ],
         expenses: [
             { id: 1, desc: 'صيانة وتصليح', amount: 50000, date: todayISO }
@@ -35,9 +39,8 @@ if (!db || typeof db !== 'object') {
     localStorage.setItem('school_erp_final_v1', JSON.stringify(db));
 }
 
-let currentStudentId = null, editingStudentId = null, tempSiblings = [], editingStaffId = null;
+let currentStudentId = null, editingStudentId = null, tempSiblings = [], editingStaffId = null, currentTeacherId = null;
 let editingDirectSibMainId = null, editingDirectSibIdx = null, editingTempSibIdx = null;
-const defaultSubjects = ['العربي','الرياضيات','الإنكليزي','الإسلامية','الكيمياء','الفيزياء','الاحياء','الفنية','الرياضة','الجرائم'];
 
 // ============ 2. محرك التنبيهات 3D (SweetAlert2) ============
 function customAlert(msg, icon = 'info') { 
@@ -53,7 +56,7 @@ function customPrompt(msg, cb) {
     else { let v = prompt(msg); cb(v); }
 }
 
-// ============ 3. التشغيل والدخول السريع (بدون ريفريش) ============
+// ============ 3. التشغيل والدخول السريع ============
 window.onload = () => {
     applyTheme(db.theme);
     if (!db.schoolName || db.schoolName.trim() === '') { 
@@ -90,6 +93,7 @@ function saveSetup() {
 function initApp() {
     if(!db.staff) db.staff = []; 
     if(!db.expenses) db.expenses = [];
+    if(!db.settings) db.settings = { subjects: [...defaultSubjects] };
     
     document.getElementById('display-school-name').innerHTML = `<i class="fas fa-university"></i> ${db.schoolName}`;
     document.getElementById('edit-school-name').value = db.schoolName; 
@@ -98,8 +102,9 @@ function initApp() {
     document.getElementById('daily-date-filter').value = todayISO;
     document.getElementById('pay-date').value = todayISO;
     document.getElementById('exp-date').value = todayISO;
+    document.getElementById('teach-pay-date').value = todayISO;
 
-    renderClasses(); renderRegions(); renderStudents(); populateClassSelects(); updateRepSectionDropdown();
+    renderClasses(); renderRegions(); renderSubjects(); renderStudents(); populateClassSelects(); updateRepSectionDropdown();
     renderDual(); renderDaily(); renderStaff(); renderExpenses(); renderStatistics();
 }
 
@@ -135,7 +140,7 @@ function applyTheme(theme) { document.body.classList.toggle('dark-mode', theme =
 function showModal(id) { document.getElementById(id).classList.add('active'); }
 function hideModal(id) { document.getElementById(id).classList.remove('active'); }
 
-// ============ 4. الإعدادات (الصفوف والمناطق) ============
+// ============ 4. الإعدادات (الصفوف والمناطق والمواد الديناميكية) ============
 function addClass() { let n=document.getElementById('new-class-name').value; if(!n)return; db.classes.push({id:Date.now(), name:n, sections:[]}); saveDB(); document.getElementById('new-class-name').value=''; initApp(); }
 function deleteClass(id) { customConfirm('تأكيد حذف الصف بكافة شعبه؟', r=>{ if(r){db.classes=db.classes.filter(c=>c.id!==id); saveDB(); initApp();}}); }
 function addSection(id) { customPrompt("اكتب اسم الشعبة الجديدة:", n=>{ if(n){db.classes.find(c=>c.id===id).sections.push({id:Date.now(),name:n}); saveDB(); initApp();}});}
@@ -151,8 +156,32 @@ function addRegion() {
 function deleteRegion(id) { customConfirm('تأكيد الحذف؟', r=>{ if(r){db.regions=db.regions.filter(x=>x.id!==id); saveDB(); renderRegions();} });}
 function renderRegions() { document.getElementById('regions-list').innerHTML = db.regions.map(r => `<div class="list-item flex-between"><div><b>${r.name}</b> (الرمز: ${r.code})<br><small><i class="fas fa-bus"></i> السائق: ${r.driver} | ${r.phone}</small></div><button type="button" class="btn-3d danger btn-small m-0" onclick="deleteRegion(${r.id})"><i class="fas fa-trash"></i></button></div>`).join(''); }
 
+function addSubject() {
+    let n = document.getElementById('new-subject-name').value;
+    if(!n) return;
+    db.settings.subjects.push(n);
+    saveDB();
+    document.getElementById('new-subject-name').value = '';
+    renderSubjects();
+}
+function deleteSubject(idx) {
+    customConfirm('حذف هذه المادة من الإعدادات؟', r => {
+        if(r) { db.settings.subjects.splice(idx, 1); saveDB(); renderSubjects(); }
+    });
+}
+function renderSubjects() {
+    document.getElementById('subjects-list').innerHTML = db.settings.subjects.map((sub, idx) => `<div class="list-item flex-between"><span><i class="fas fa-book-open text-primary"></i> ${sub}</span><button type="button" class="btn-3d danger btn-small m-0" onclick="deleteSubject(${idx})"><i class="fas fa-trash"></i></button></div>`).join('');
+}
+
 // ============ 5. بيانات الطلاب الأساسية ============
-function populateClassSelects() { let opts = '<option value="">اختر الصف</option>'+db.classes.map(c=>`<option value="${c.id}">${c.name}</option>`).join(''); ['std-class','sib-class','rep-class'].forEach(id=>document.getElementById(id).innerHTML=opts); }
+function populateClassSelects() { 
+    let opts = '<option value="">اختر الصف</option>'+db.classes.map(c=>`<option value="${c.id}">${c.name}</option>`).join(''); 
+    ['std-class','sib-class','rep-class'].forEach(id=>document.getElementById(id).innerHTML=opts); 
+    
+    let drvOpts = '<option value="">اختر خط النقل / السائق</option>'+db.regions.map(r=>`<option value="${r.code}">${r.name} - ${r.driver}</option>`).join('');
+    let drvEl = document.getElementById('rep-driver');
+    if(drvEl) drvEl.innerHTML = drvOpts;
+}
 function updateSectionDropdown() { updateDropdown('std-class', 'std-section'); } function updateSibSectionDropdown() { updateDropdown('sib-class', 'sib-section'); } function updateRepSectionDropdown() { updateDropdown('rep-class', 'rep-section'); generateReport(); }
 function updateDropdown(cId, sId, sVal=null) { let v=document.getElementById(cId).value, sel=document.getElementById(sId); sel.innerHTML='<option value="">اختر الشعبة</option>'; let c=db.classes.find(x=>x.id==v); if(c){ sel.innerHTML+=c.sections.map(s=>`<option value="${s.id}">${s.name}</option>`).join(''); if(sVal) sel.value=sVal;} }
 function checkRegionCode() { let reg=db.regions.find(r=>r.code===document.getElementById('std-reg-code').value); document.getElementById('std-reg-name').value=reg?reg.name:''; document.getElementById('std-driver-name').value=reg?reg.driver:''; }
@@ -193,7 +222,7 @@ function openAddSiblingModal() {
     editingDirectSibMainId = null;
     editingDirectSibIdx = null;
     editingTempSibIdx = null;
-    ['sib-reg','sib-name','sib-class','sib-section'].forEach(id=>document.getElementById(id).value=''); 
+    ['sib-reg','sib-name','sib-class','sib-section','sib-fee'].forEach(id=>document.getElementById(id).value=''); 
     showModal('add-sibling-modal');
 }
 
@@ -206,6 +235,7 @@ function editTempSibling(idx) {
     document.getElementById('sib-name').value = sib.name;
     document.getElementById('sib-class').value = sib.classId;
     updateDropdown('sib-class', 'sib-section', sib.sectionId);
+    document.getElementById('sib-fee').value = sib.fee || '';
     showModal('add-sibling-modal');
 }
 
@@ -219,6 +249,7 @@ function editSiblingDirect(mainId, sibIdx) {
     document.getElementById('sib-name').value = sib.name;
     document.getElementById('sib-class').value = sib.classId;
     updateDropdown('sib-class', 'sib-section', sib.sectionId);
+    document.getElementById('sib-fee').value = sib.fee || '';
     showModal('add-sibling-modal');
 }
 
@@ -243,7 +274,8 @@ function saveSiblingTemp() {
         regId: document.getElementById('sib-reg').value, 
         name: n, 
         classId: document.getElementById('sib-class').value, 
-        sectionId: document.getElementById('sib-section').value
+        sectionId: document.getElementById('sib-section').value,
+        fee: parseFloat(document.getElementById('sib-fee').value) || 0
     };
 
     if (editingDirectSibMainId !== null && editingDirectSibIdx !== null) {
@@ -266,11 +298,11 @@ function saveSiblingTemp() {
         renderTempSiblings(); 
         hideModal('add-sibling-modal'); 
     }
-    ['sib-reg','sib-name','sib-class','sib-section'].forEach(id=>document.getElementById(id).value=''); 
+    ['sib-reg','sib-name','sib-class','sib-section','sib-fee'].forEach(id=>document.getElementById(id).value=''); 
 }
 
 function renderTempSiblings() { 
-    document.getElementById('siblings-temp-list').innerHTML=tempSiblings.map((s,i)=>`<div class="list-item flex-between p-2"><span><i class="fas fa-child"></i> ${s.name}</span> <div class="flex-row"><button type="button" class="btn-3d warning btn-small m-0" onclick="editTempSibling(${i})"><i class="fas fa-pen"></i></button><button type="button" class="btn-3d danger btn-small m-0" onclick="tempSiblings.splice(${i},1); renderTempSiblings()"><i class="fas fa-trash"></i></button></div></div>`).join(''); 
+    document.getElementById('siblings-temp-list').innerHTML=tempSiblings.map((s,i)=>`<div class="list-item flex-between p-2"><span><i class="fas fa-child"></i> ${s.name} <small>(${s.fee.toLocaleString()})</small></span> <div class="flex-row"><button type="button" class="btn-3d warning btn-small m-0" onclick="editTempSibling(${i})"><i class="fas fa-pen"></i></button><button type="button" class="btn-3d danger btn-small m-0" onclick="tempSiblings.splice(${i},1); renderTempSiblings()"><i class="fas fa-trash"></i></button></div></div>`).join(''); 
 }
 
 function saveStudent() {
@@ -289,7 +321,8 @@ function renderStudents(filter="") {
         let matchM=s.name.includes(filter) || (s.regId && s.regId.includes(filter)); let matchS=(s.siblings||[]).find(sib=>sib.name.includes(filter));
         if(matchM || (filter!=="" && matchS)) {
             let cls=db.classes.find(c=>c.id==s.classId), paid=s.payments.reduce((sum,p)=>sum+p.amount,0);
-            html+=`<div class="list-item flex-between" style="cursor:pointer;" onclick="openProfile(${s.id})"><div><strong><i class="fas fa-user-graduate text-primary"></i> ${s.name}</strong><br><small>الصف: ${cls?cls.name:'-'} | ذمة: <span style="color:#e74c3c">${(s.tuition-paid).toLocaleString()}</span></small></div><div class="flex-row"><button type="button" class="btn-3d btn-small m-0" style="background:#a777e3; color:white;" onclick="event.stopPropagation(); openProfile(${s.id})"><i class="fas fa-folder-open"></i> الحساب</button><button type="button" class="btn-3d warning btn-small m-0" onclick="event.stopPropagation(); editStudent(${s.id})"><i class="fas fa-pen"></i></button><button type="button" class="btn-3d danger btn-small m-0" onclick="event.stopPropagation(); deleteStudent(${s.id})"><i class="fas fa-trash"></i></button></div></div>`;
+            let totTuition = s.tuition + (s.siblings||[]).reduce((a,b)=>a+(b.fee||0),0);
+            html+=`<div class="list-item flex-between" style="cursor:pointer;" onclick="openProfile(${s.id})"><div><strong><i class="fas fa-user-graduate text-primary"></i> ${s.name}</strong><br><small>الصف: ${cls?cls.name:'-'} | ذمة: <span style="color:#e74c3c">${(totTuition-paid).toLocaleString()}</span></small></div><div class="flex-row"><button type="button" class="btn-3d btn-small m-0" style="background:#a777e3; color:white;" onclick="event.stopPropagation(); openProfile(${s.id})"><i class="fas fa-folder-open"></i> الحساب</button><button type="button" class="btn-3d warning btn-small m-0" onclick="event.stopPropagation(); editStudent(${s.id})"><i class="fas fa-pen"></i></button><button type="button" class="btn-3d danger btn-small m-0" onclick="event.stopPropagation(); deleteStudent(${s.id})"><i class="fas fa-trash"></i></button></div></div>`;
         }
         if(filter==="" || matchM || matchS){
             (s.siblings||[]).forEach((sib, sibIdx)=>{
@@ -305,14 +338,15 @@ function renderStudents(filter="") {
 
 function deleteStudent(id) { customConfirm("حذف الطالب نهائياً من النظام (مع كافة سجلاته)؟", r=>{ if(r){db.students=db.students.filter(s=>s.id!==id); saveDB(); renderStudents(); renderDual(); if(typeof renderStatistics === 'function') renderStatistics();} }); }
 
-// ============ 6. ملف الطالب المالي والدرجات ============
+// ============ 6. ملف الطالب المالي والدرجات (مع ديناميكية المواد) ============
 function openProfile(id) {
     currentStudentId=id; let s=db.students.find(x=>x.id===id); let c=db.classes.find(x=>x.id==s.classId), sec=c?c.sections.find(x=>x.id==s.sectionId):null;
     document.getElementById('prof-name').innerText=s.name; document.getElementById('prof-details').innerText=`الصف: ${c?c.name:'-'} | الشعبة: ${sec?sec.name:'-'} | موبايل: ${s.phone||'-'}`; document.getElementById('prof-reg').innerText=s.regId||'-';
     updateFinance(s); showModal('student-profile-modal');
 }
 function updateFinance(s) {
-    let paid=s.payments.reduce((sum,p)=>sum+p.amount,0); document.getElementById('prof-total').innerText=s.tuition.toLocaleString(); document.getElementById('prof-paid').innerText=paid.toLocaleString(); document.getElementById('prof-rem').innerText=(s.tuition-paid).toLocaleString();
+    let totTuition = s.tuition + (s.siblings||[]).reduce((a,b)=>a+(b.fee||0),0);
+    let paid=s.payments.reduce((sum,p)=>sum+p.amount,0); document.getElementById('prof-total').innerText=totTuition.toLocaleString(); document.getElementById('prof-paid').innerText=paid.toLocaleString(); document.getElementById('prof-rem').innerText=(totTuition-paid).toLocaleString();
     document.getElementById('payments-history').innerHTML=s.payments.map((p,i)=>`<div class="list-item flex-between p-2"><span>${p.amount.toLocaleString()} د.ع | ${p.date}</span> <button type="button" class="btn-3d danger btn-small m-0" onclick="delPayment(${i})"><i class="fas fa-trash"></i></button></div>`).join('');
 }
 function submitPayment() { 
@@ -325,23 +359,87 @@ function submitPayment() {
 function delPayment(i) { customConfirm('حذف الدفعة المحددة؟', r=>{ if(r){let s=db.students.find(x=>x.id===currentStudentId); s.payments.splice(i,1); saveDB(); updateFinance(s); renderDual(); renderDaily();} }); }
 
 function openGrades() {
-    let s=db.students.find(x=>x.id===currentStudentId); if(!s.grades)s.grades={}; if(!s.grades.subNames)s.grades.subNames=[...defaultSubjects];
+    let s=db.students.find(x=>x.id===currentStudentId); if(!s.grades)s.grades={}; if(!s.grades.subNames)s.grades.subNames=[...db.settings.subjects];
+    let subCount = db.settings.subjects.length;
     let html=`<table class="grades-tbl"><thead><tr class="bg-light"><th rowspan="2" class="bg-blue">المادة</th><th colspan="3">الفصل الأول</th><th rowspan="2" class="bg-yellow">معدل ف1</th><th rowspan="2">نصف السنة</th><th colspan="3">الفصل الثاني</th><th rowspan="2" class="bg-yellow">معدل ف2</th><th rowspan="2" class="bg-yellow">السعي السنوي</th><th rowspan="2">الامتحان النهائي</th><th rowspan="2" class="bg-yellow">الدرجة النهائية</th></tr><tr class="bg-light"><th>ش1</th><th>ش2</th><th>ش3</th><th>ش1</th><th>ش2</th><th>ش3</th></tr></thead><tbody>`;
-    for(let i=0; i<10; i++){ let g=s.grades[i]||{}; html+=`<tr><td><input type="text" id="g_sub_${i}" value="${s.grades.subNames[i]||''}" class="sub-name" oninput="calcCols()"></td><td><input type="number" id="g_${i}_m11" value="${g.m11||''}" oninput="calcRow(${i});calcCols();"></td><td><input type="number" id="g_${i}_m12" value="${g.m12||''}" oninput="calcRow(${i});calcCols();"></td><td><input type="number" id="g_${i}_m13" value="${g.m13||''}" oninput="calcRow(${i});calcCols();"></td><td class="bg-yellow"><input type="number" id="g_${i}_avg1" value="${g.avg1||''}" readonly></td><td><input type="number" id="g_${i}_mid" value="${g.mid||''}" oninput="calcRow(${i});calcCols();"></td><td><input type="number" id="g_${i}_m21" value="${g.m21||''}" oninput="calcRow(${i});calcCols();"></td><td><input type="number" id="g_${i}_m22" value="${g.m22||''}" oninput="calcRow(${i});calcCols();"></td><td><input type="number" id="g_${i}_m23" value="${g.m23||''}" oninput="calcRow(${i});calcCols();"></td><td class="bg-yellow"><input type="number" id="g_${i}_avg2" value="${g.avg2||''}" readonly></td><td class="bg-yellow"><input type="number" id="g_${i}_year" value="${g.year||''}" readonly></td><td><input type="number" id="g_${i}_final" value="${g.final||''}" oninput="calcRow(${i});calcCols();"></td><td class="bg-yellow"><input type="number" id="g_${i}_tot" value="${g.tot||''}" readonly></td></tr>`; }
+    for(let i=0; i<subCount; i++){ 
+        let g=s.grades[i]||{}; 
+        let currentSubName = s.grades.subNames[i] || db.settings.subjects[i] || '';
+        html+=`<tr><td><input type="text" id="g_sub_${i}" value="${currentSubName}" class="sub-name" oninput="calcCols()"></td><td><input type="number" id="g_${i}_m11" value="${g.m11||''}" oninput="calcRow(${i});calcCols();"></td><td><input type="number" id="g_${i}_m12" value="${g.m12||''}" oninput="calcRow(${i});calcCols();"></td><td><input type="number" id="g_${i}_m13" value="${g.m13||''}" oninput="calcRow(${i});calcCols();"></td><td class="bg-yellow"><input type="number" id="g_${i}_avg1" value="${g.avg1||''}" readonly></td><td><input type="number" id="g_${i}_mid" value="${g.mid||''}" oninput="calcRow(${i});calcCols();"></td><td><input type="number" id="g_${i}_m21" value="${g.m21||''}" oninput="calcRow(${i});calcCols();"></td><td><input type="number" id="g_${i}_m22" value="${g.m22||''}" oninput="calcRow(${i});calcCols();"></td><td><input type="number" id="g_${i}_m23" value="${g.m23||''}" oninput="calcRow(${i});calcCols();"></td><td class="bg-yellow"><input type="number" id="g_${i}_avg2" value="${g.avg2||''}" readonly></td><td class="bg-yellow"><input type="number" id="g_${i}_year" value="${g.year||''}" readonly></td><td><input type="number" id="g_${i}_final" value="${g.final||''}" oninput="calcRow(${i});calcCols();"></td><td class="bg-yellow"><input type="number" id="g_${i}_tot" value="${g.tot||''}" readonly></td></tr>`; 
+    }
     html+=`<tr class="bg-light"><td class="bg-yellow">المجموع</td><td class="bg-yellow"><input type="number" id="g_tot_m11" readonly></td><td class="bg-yellow"><input type="number" id="g_tot_m12" readonly></td><td class="bg-yellow"><input type="number" id="g_tot_m13" readonly></td><td class="bg-yellow"><input type="number" id="g_tot_avg1" readonly></td><td class="bg-yellow"><input type="number" id="g_tot_mid" readonly></td><td class="bg-yellow"><input type="number" id="g_tot_m21" readonly></td><td class="bg-yellow"><input type="number" id="g_tot_m22" readonly></td><td class="bg-yellow"><input type="number" id="g_tot_m23" readonly></td><td class="bg-yellow"><input type="number" id="g_tot_avg2" readonly></td><td class="bg-yellow"><input type="number" id="g_tot_year" readonly></td><td class="bg-yellow"><input type="number" id="g_tot_final" readonly></td><td class="bg-yellow"><input type="number" id="g_tot_tot" readonly></td></tr><tr class="bg-light"><td class="bg-yellow">المعدل</td><td class="bg-yellow"><input type="number" id="g_avg_m11" readonly></td><td class="bg-yellow"><input type="number" id="g_avg_m12" readonly></td><td class="bg-yellow"><input type="number" id="g_avg_m13" readonly></td><td class="bg-yellow"><input type="number" id="g_avg_avg1" readonly></td><td class="bg-yellow"><input type="number" id="g_avg_mid" readonly></td><td class="bg-yellow"><input type="number" id="g_avg_m21" readonly></td><td class="bg-yellow"><input type="number" id="g_avg_m22" readonly></td><td class="bg-yellow"><input type="number" id="g_avg_m23" readonly></td><td class="bg-yellow"><input type="number" id="g_avg_avg2" readonly></td><td class="bg-yellow"><input type="number" id="g_avg_year" readonly></td><td class="bg-yellow"><input type="number" id="g_avg_final" readonly></td><td class="bg-yellow"><input type="number" id="g_avg_tot" readonly></td></tr><tr><td>النتيجة</td><td colspan="12"><input type="text" id="g_footer" value="${s.grades['footer']||''}" style="width:100%; text-align:right;" placeholder="اكتب النتيجة هنا..."></td></tr></tbody></table>`;
-    document.getElementById('grades-table-container').innerHTML=html; for(let i=0;i<10;i++)calcRow(i); calcCols(); showModal('grades-modal');
+    document.getElementById('grades-table-container').innerHTML=html; for(let i=0;i<subCount;i++)calcRow(i); calcCols(); showModal('grades-modal');
 }
 function calcRow(i) { let get=id=>{let v=parseFloat(document.getElementById(id).value); return isNaN(v)?null:v;}; let set=(id,v)=>{document.getElementById(id).value=(v!==null)?Math.round(v):'';}; let avg=arr=>{let f=arr.filter(x=>x!==null); return f.length?f.reduce((a,b)=>a+b)/f.length:null;}; let a1=avg([get(`g_${i}_m11`),get(`g_${i}_m12`),get(`g_${i}_m13`)]); set(`g_${i}_avg1`,a1); let a2=avg([get(`g_${i}_m21`),get(`g_${i}_m22`),get(`g_${i}_m23`)]); set(`g_${i}_avg2`,a2); let yr=avg([a1,get(`g_${i}_mid`),a2]); set(`g_${i}_year`,yr); let fn=get(`g_${i}_final`), tot=(yr!==null&&fn!==null)?(yr+fn)/2:null; set(`g_${i}_tot`,tot); }
-function calcCols() { let cols=['m11','m12','m13','avg1','mid','m21','m22','m23','avg2','year','final','tot']; let vC=Array.from({length:10}).filter((_,i)=>document.getElementById(`g_sub_${i}`).value.trim()!=='').length||1; cols.forEach(c=>{ let sum=0, cnt=0; for(let i=0;i<10;i++){let v=parseFloat(document.getElementById(`g_${i}_${c}`).value); if(!isNaN(v)){sum+=v;cnt++;}} document.getElementById(`g_tot_${c}`).value=cnt>0?Math.round(sum):''; document.getElementById(`g_avg_${c}`).value=cnt>0?(sum/vC).toFixed(1).replace(/\.0$/,''):''; }); }
-function saveGrades() { let s=db.students.find(x=>x.id===currentStudentId); s.grades.subNames=[]; for(let i=0;i<10;i++){ s.grades.subNames.push(document.getElementById(`g_sub_${i}`).value); s.grades[i]={m11:document.getElementById(`g_${i}_m11`).value, m12:document.getElementById(`g_${i}_m12`).value, m13:document.getElementById(`g_${i}_m13`).value, avg1:document.getElementById(`g_${i}_avg1`).value, mid:document.getElementById(`g_${i}_mid`).value, m21:document.getElementById(`g_${i}_m21`).value, m22:document.getElementById(`g_${i}_m22`).value, m23:document.getElementById(`g_${i}_m23`).value, avg2:document.getElementById(`g_${i}_avg2`).value, year:document.getElementById(`g_${i}_year`).value, final:document.getElementById(`g_${i}_final`).value, tot:document.getElementById(`g_${i}_tot`).value}; } s.grades['footer']=document.getElementById('g_footer').value; saveDB(); if(typeof Swal !== 'undefined') Swal.fire({toast:true,position:'top-end',icon:'success',title:'تم حفظ الدرجات',showConfirmButton:false,timer:1500}); }
+function calcCols() { let cols=['m11','m12','m13','avg1','mid','m21','m22','m23','avg2','year','final','tot']; let subCount=db.settings.subjects.length; let vC=Array.from({length:subCount}).filter((_,i)=>document.getElementById(`g_sub_${i}`).value.trim()!=='').length||1; cols.forEach(c=>{ let sum=0, cnt=0; for(let i=0;i<subCount;i++){let v=parseFloat(document.getElementById(`g_${i}_${c}`).value); if(!isNaN(v)){sum+=v;cnt++;}} document.getElementById(`g_tot_${c}`).value=cnt>0?Math.round(sum):''; document.getElementById(`g_avg_${c}`).value=cnt>0?(sum/vC).toFixed(1).replace(/\.0$/,''):''; }); }
+function saveGrades() { let s=db.students.find(x=>x.id===currentStudentId); s.grades.subNames=[]; let subCount=db.settings.subjects.length; for(let i=0;i<subCount;i++){ s.grades.subNames.push(document.getElementById(`g_sub_${i}`).value); s.grades[i]={m11:document.getElementById(`g_${i}_m11`).value, m12:document.getElementById(`g_${i}_m12`).value, m13:document.getElementById(`g_${i}_m13`).value, avg1:document.getElementById(`g_${i}_avg1`).value, mid:document.getElementById(`g_${i}_mid`).value, m21:document.getElementById(`g_${i}_m21`).value, m22:document.getElementById(`g_${i}_m22`).value, m23:document.getElementById(`g_${i}_m23`).value, avg2:document.getElementById(`g_${i}_avg2`).value, year:document.getElementById(`g_${i}_year`).value, final:document.getElementById(`g_${i}_final`).value, tot:document.getElementById(`g_${i}_tot`).value}; } s.grades['footer']=document.getElementById('g_footer').value; saveDB(); if(typeof Swal !== 'undefined') Swal.fire({toast:true,position:'top-end',icon:'success',title:'تم حفظ الدرجات',showConfirmButton:false,timer:1500}); }
 
-// ============ 7. الرواتب والموظفين ============
+// ============ 7. الرواتب والموظفين (تفاعلي وإداري) ============
 function openAddStaffModal() { editingStaffId=null; document.getElementById('staff-modal-title').innerHTML='<i class="fas fa-user-plus"></i> إضافة موظف'; ['staff-name','staff-role','staff-salary'].forEach(id=>document.getElementById(id).value=''); showModal('add-staff-modal'); }
-function saveStaff() { let n=document.getElementById('staff-name').value, r=document.getElementById('staff-role').value, s=parseFloat(document.getElementById('staff-salary').value)||0; if(!n||s<=0) return customAlert('يرجى إدخال الاسم والراتب بشكل صحيح', 'error'); if(editingStaffId){ let idx=db.staff.findIndex(x=>x.id===editingStaffId); db.staff[idx].name=n; db.staff[idx].role=r; db.staff[idx].salary=s; } else { db.staff.push({ id:Date.now(), name:n, role:r, salary:s, payments:[] }); } saveDB(); hideModal('add-staff-modal'); renderStaff(); renderDual(); if(typeof Swal !== 'undefined') Swal.fire({toast:true, position:'top-end', icon:'success', title:'تم الحفظ', showConfirmButton:false, timer:1500}); }
+function saveStaff() { let n=document.getElementById('staff-name').value, r=document.getElementById('staff-role').value, s=parseFloat(document.getElementById('staff-salary').value)||0; if(!n||s<=0) return customAlert('يرجى إدخال الاسم والراتب بشكل صحيح', 'error'); if(editingStaffId){ let idx=db.staff.findIndex(x=>x.id===editingStaffId); db.staff[idx].name=n; db.staff[idx].role=r; db.staff[idx].salary=s; } else { db.staff.push({ id:Date.now(), name:n, role:r, salary:s, isTeacher:false, payments:[] }); } saveDB(); hideModal('add-staff-modal'); renderStaff(); renderDual(); if(typeof Swal !== 'undefined') Swal.fire({toast:true, position:'top-end', icon:'success', title:'تم الحفظ', showConfirmButton:false, timer:1500}); }
 function editStaff(id) { editingStaffId=id; let s=db.staff.find(x=>x.id===id); document.getElementById('staff-modal-title').innerHTML='<i class="fas fa-edit"></i> تعديل موظف'; document.getElementById('staff-name').value=s.name; document.getElementById('staff-role').value=s.role; document.getElementById('staff-salary').value=s.salary; showModal('add-staff-modal'); }
-function deleteStaff(id) { customConfirm("تأكيد حذف الموظف وكل سجلات مدفوعاته؟", r=>{ if(r){db.staff=db.staff.filter(x=>x.id!==id); saveDB(); renderStaff(); renderDual(); renderDaily();} }); }
-function payStaff(id) { customPrompt("المبلغ المراد صرفه للموظف (د.ع):", amt=>{ let v=parseFloat(amt); if(v>0){ db.staff.find(x=>x.id===id).payments.push({amount:v, date:todayISO}); saveDB(); renderStaff(); renderDual(); renderDaily(); if(typeof Swal !== 'undefined') Swal.fire({toast:true, position:'top-end', icon:'success', title:'تم صرف المبلغ بنجاح', showConfirmButton:false, timer:1500}); } }); }
-function renderStaff() { document.getElementById('staff-list').innerHTML = db.staff.map(st => { let paid = st.payments.reduce((s,p)=>s+p.amount,0); return `<div class="list-item flex-between"><div><strong><i class="fas fa-user-tie text-primary"></i> ${st.name}</strong> <small>(${st.role})</small><br><small>الراتب: ${st.salary.toLocaleString()} | المصروف: <span style="color:#2ecc71">${paid.toLocaleString()}</span> | الباقي: <span style="color:#e74c3c">${(st.salary-paid).toLocaleString()}</span></small></div><div class="flex-row"><button type="button" class="btn-3d success btn-small m-0" onclick="payStaff(${st.id})"><i class="fas fa-hand-holding-usd"></i> صرف</button> <button type="button" class="btn-3d warning btn-small m-0" onclick="editStaff(${st.id})"><i class="fas fa-pen"></i></button> <button type="button" class="btn-3d danger btn-small m-0" onclick="deleteStaff(${st.id})"><i class="fas fa-trash"></i></button></div></div>`; }).join('') || '<div class="text-center mt-3">لا توجد بيانات</div>'; }
+
+function openAddTeacherModal() { editingStaffId=null; document.getElementById('teacher-modal-title').innerHTML='<i class="fas fa-chalkboard-teacher"></i> إضافة مدرس'; ['teacher-name','teacher-role','teacher-year'].forEach(id=>document.getElementById(id).value=''); showModal('add-teacher-modal'); }
+function saveTeacher() { let n=document.getElementById('teacher-name').value, r=document.getElementById('teacher-role').value, y=parseInt(document.getElementById('teacher-year').value)||new Date().getFullYear(); if(!n) return customAlert('الاسم مطلوب', 'error'); if(editingStaffId){ let idx=db.staff.findIndex(x=>x.id===editingStaffId); db.staff[idx].name=n; db.staff[idx].role=r; db.staff[idx].hiringYear=y; } else { db.staff.push({ id:Date.now(), name:n, role:r, hiringYear:y, salary:0, isTeacher:true, payments:[] }); } saveDB(); hideModal('add-teacher-modal'); renderStaff(); renderDual(); if(typeof Swal !== 'undefined') Swal.fire({toast:true, position:'top-end', icon:'success', title:'تم حفظ المدرس', showConfirmButton:false, timer:1500}); }
+function editTeacher(id) { editingStaffId=id; let s=db.staff.find(x=>x.id===id); document.getElementById('teacher-modal-title').innerHTML='<i class="fas fa-edit"></i> تعديل مدرس'; document.getElementById('teacher-name').value=s.name; document.getElementById('teacher-role').value=s.role; document.getElementById('teacher-year').value=s.hiringYear; showModal('add-teacher-modal'); }
+
+function deleteStaff(id) { customConfirm("تأكيد حذف الموظف/المدرس وكل سجلات مدفوعاته؟", r=>{ if(r){db.staff=db.staff.filter(x=>x.id!==id); saveDB(); renderStaff(); renderDual(); renderDaily();} }); }
+
+function payStaff(id) { customPrompt("المبلغ المراد صرفه للإداري (د.ع):", amt=>{ let v=parseFloat(amt); if(v>0){ db.staff.find(x=>x.id===id).payments.push({amount:v, date:todayISO}); saveDB(); renderStaff(); renderDual(); renderDaily(); if(typeof Swal !== 'undefined') Swal.fire({toast:true, position:'top-end', icon:'success', title:'تم صرف المبلغ بنجاح', showConfirmButton:false, timer:1500}); } }); }
+
+function payTeacher(id) {
+    currentTeacherId = id;
+    ['teach-pay-lecs','teach-pay-stds','teach-pay-eval','teach-pay-bonus','teach-pay-deduct'].forEach(el=>document.getElementById(el).value='');
+    document.getElementById('teach-pay-date').value = todayISO;
+    calcTeacherSalary();
+    showModal('pay-teacher-modal');
+}
+
+function calcTeacherSalary() {
+    if(!currentTeacherId) return;
+    let st = db.staff.find(x => x.id === currentTeacherId);
+    let curYear = new Date().getFullYear();
+    let serviceYears = Math.max(0, curYear - (st.hiringYear || curYear));
+    let lecPrice = Math.min(1500 + (serviceYears * 250), 4000);
+    
+    document.getElementById('teach-pay-years').innerText = serviceYears;
+    document.getElementById('teach-pay-price').innerText = lecPrice.toLocaleString();
+    
+    let wLecs = parseFloat(document.getElementById('teach-pay-lecs').value) || 0;
+    let sAvg = parseFloat(document.getElementById('teach-pay-stds').value) || 0;
+    let evalPts = parseFloat(document.getElementById('teach-pay-eval').value) || 0;
+    let bonus = parseFloat(document.getElementById('teach-pay-bonus').value) || 0;
+    let deduct = parseFloat(document.getElementById('teach-pay-deduct').value) || 0;
+    
+    let base = lecPrice * (wLecs * 4);
+    let stdBonus = sAvg * 500;
+    let evalBonus = evalPts * 1000;
+    let net = base + stdBonus + evalBonus + bonus - deduct;
+    
+    document.getElementById('teach-pay-net').innerText = net.toLocaleString();
+    return net;
+}
+
+function submitTeacherPayment() {
+    let net = calcTeacherSalary();
+    let dt = document.getElementById('teach-pay-date').value;
+    if(net > 0 && dt) {
+        db.staff.find(x => x.id === currentTeacherId).payments.push({amount: net, date: dt});
+        saveDB(); hideModal('pay-teacher-modal'); renderStaff(); renderDual(); renderDaily();
+        if(typeof Swal !== 'undefined') Swal.fire({toast:true, position:'top-end', icon:'success', title:'تم صرف راتب المدرس بنجاح', showConfirmButton:false, timer:1500});
+    } else { customAlert("الصافي يجب أن يكون أكبر من صفر والتاريخ مطلوب", "error"); }
+}
+
+function renderStaff() { 
+    document.getElementById('staff-list').innerHTML = db.staff.map(st => { 
+        let paid = st.payments.reduce((s,p)=>s+p.amount,0); 
+        if(st.isTeacher) {
+            return `<div class="list-item flex-between" style="border-right: 4px solid #f39c12;"><div><strong><i class="fas fa-chalkboard-teacher text-warning"></i> ${st.name}</strong> <small>(${st.role})</small><br><small>التعيين: ${st.hiringYear} | المصروف: <span style="color:#2ecc71">${paid.toLocaleString()}</span></small></div><div class="flex-row"><button type="button" class="btn-3d warning btn-small m-0" onclick="payTeacher(${st.id})"><i class="fas fa-calculator"></i> راتب تفاعلي</button> <button type="button" class="btn-3d btn-small m-0" style="background:#a777e3;" onclick="editTeacher(${st.id})"><i class="fas fa-pen"></i></button> <button type="button" class="btn-3d danger btn-small m-0" onclick="deleteStaff(${st.id})"><i class="fas fa-trash"></i></button></div></div>`;
+        } else {
+            return `<div class="list-item flex-between" style="border-right: 4px solid #3498db;"><div><strong><i class="fas fa-user-tie text-primary"></i> ${st.name}</strong> <small>(${st.role})</small><br><small>الراتب المقطوع: ${st.salary.toLocaleString()} | المصروف: <span style="color:#2ecc71">${paid.toLocaleString()}</span> | الباقي: <span style="color:#e74c3c">${(st.salary-paid).toLocaleString()}</span></small></div><div class="flex-row"><button type="button" class="btn-3d success btn-small m-0" onclick="payStaff(${st.id})"><i class="fas fa-hand-holding-usd"></i> صرف</button> <button type="button" class="btn-3d warning btn-small m-0" onclick="editStaff(${st.id})"><i class="fas fa-pen"></i></button> <button type="button" class="btn-3d danger btn-small m-0" onclick="deleteStaff(${st.id})"><i class="fas fa-trash"></i></button></div></div>`; 
+        }
+    }).join('') || '<div class="text-center mt-3">لا توجد بيانات</div>'; 
+}
 
 // ============ 8. المصروفات التشغيلية ============
 function openAddExpenseModal() { document.getElementById('exp-desc').value=''; document.getElementById('exp-amount').value=''; document.getElementById('exp-date').value = todayISO; showModal('add-expense-modal'); }
@@ -365,7 +463,10 @@ function renderDaily() {
 
 function renderDual() {
     let exp=0, col=0, sal=0, exs=0;
-    db.students.forEach(s => { exp+=s.tuition; col+=s.payments.reduce((a,b)=>a+b.amount, 0); });
+    db.students.forEach(s => { 
+        let totTuition = s.tuition + (s.siblings||[]).reduce((a,b)=>a+(b.fee||0),0);
+        exp+=totTuition; col+=s.payments.reduce((a,b)=>a+b.amount, 0); 
+    });
     db.staff.forEach(st => sal+=st.payments.reduce((a,b)=>a+b.amount, 0));
     db.expenses.forEach(e => exs+=e.amount);
     
@@ -374,6 +475,23 @@ function renderDual() {
     document.getElementById('dash-expenses').innerText = exs.toLocaleString();
     
     let net = col - sal - exs; let netEl = document.getElementById('dash-net'); netEl.innerText = net.toLocaleString(); netEl.style.color = net>=0 ? '#2ecc71' : '#e74c3c';
+    
+    if(typeof calcDifference === 'function') calcDifference();
+}
+
+function calcDifference() {
+    let netEl = document.getElementById('dash-net');
+    let actualEl = document.getElementById('dash-actual');
+    let diffEl = document.getElementById('dash-diff');
+    if(!netEl || !actualEl || !diffEl) return;
+    
+    let netText = netEl.innerText.replace(/,/g, '');
+    let net = parseFloat(netText) || 0;
+    let actual = parseFloat(actualEl.value) || 0;
+    
+    let diff = net - actual;
+    diffEl.innerText = diff.toLocaleString();
+    diffEl.style.color = diff === 0 ? '#2ecc71' : '#e74c3c';
 }
 
 // ============ 10. إحصائيات النظام ============
@@ -427,12 +545,61 @@ function renderStatistics() {
 }
 
 // ============ 11. التقارير والطباعة ============
-function generateReport() { let cId=document.getElementById('rep-class').value, sId=document.getElementById('rep-section').value; if(!cId||!sId){document.getElementById('report-list').innerHTML='';return;} let f=db.students.filter(s=>s.classId==cId && s.sectionId==sId).map(s=>({...s, isSib:false})); db.students.forEach(m=>{ (m.siblings||[]).forEach(sib=>{ if(sib.classId==cId && sib.sectionId==sId) f.push({name:sib.name, isSib:true, mName:m.name}); }); }); f.sort((a,b)=>a.name.localeCompare(b.name,'ar')); document.getElementById('report-list').innerHTML=f.map((s,i)=>`<div class="list-item"><b>${i+1}.</b> ${s.name} ${s.isSib?`<small style="color:red;">(أخ لـ ${s.mName})</small>`:''}</div>`).join(''); }
+function generateReport() { 
+    let cId=document.getElementById('rep-class').value, sId=document.getElementById('rep-section').value; 
+    if(!cId||!sId){document.getElementById('report-list').innerHTML='';return;} 
+    let f=db.students.filter(s=>s.classId==cId && s.sectionId==sId).map(s=>({...s, isSib:false})); 
+    db.students.forEach(m=>{ (m.siblings||[]).forEach(sib=>{ if(sib.classId==cId && sib.sectionId==sId) f.push({name:sib.name, isSib:true, mName:m.name}); }); }); 
+    f.sort((a,b)=>a.name.localeCompare(b.name,'ar')); 
+    document.getElementById('report-list').innerHTML=f.map((s,i)=>`<div class="list-item"><b>${i+1}.</b> ${s.name} ${s.isSib?`<small style="color:red;">(أخ لـ ${s.mName})</small>`:''}</div>`).join(''); 
+}
 
 function exportReportExcel() { 
     try {
-        let cId=document.getElementById('rep-class').value, sId=document.getElementById('rep-section').value; let c=db.classes.find(x=>x.id==cId), s=c?c.sections.find(x=>x.id==sId):null; if(!c||!s) return customAlert('اختر الصف والشعبة', 'warning'); let f=db.students.filter(x=>x.classId==cId && x.sectionId==sId).map(x=>({...x, isSib:false, ph:x.phone})); db.students.forEach(m=>{ (m.siblings||[]).forEach(sib=>{ if(sib.classId==cId && sib.sectionId==sId) f.push({name:sib.name, isSib:true, ph:m.phone}); }); }); f.sort((a,b)=>a.name.localeCompare(b.name,'ar')); let data=[[`تقرير الصف: ${c.name} - الشعبة: ${s.name}`],["التسلسل","اسم الطالب","ملاحظة","الموبايل"]]; f.forEach((x,i)=>{ data.push([i+1, x.name, x.isSib?'أخ/أخت':'', x.ph]); }); 
+        let cId=document.getElementById('rep-class').value, sId=document.getElementById('rep-section').value; 
+        let c=db.classes.find(x=>x.id==cId), s=c?c.sections.find(x=>x.id==sId):null; 
+        if(!c||!s) return customAlert('اختر الصف والشعبة', 'warning'); 
+        let f=db.students.filter(x=>x.classId==cId && x.sectionId==sId).map(x=>({...x, isSib:false, ph:x.phone})); 
+        db.students.forEach(m=>{ (m.siblings||[]).forEach(sib=>{ if(sib.classId==cId && sib.sectionId==sId) f.push({name:sib.name, isSib:true, ph:m.phone}); }); }); 
+        f.sort((a,b)=>a.name.localeCompare(b.name,'ar')); 
+        let data=[[`تقرير الصف: ${c.name} - الشعبة: ${s.name}`],["التسلسل","اسم الطالب","ملاحظة","الموبايل"]]; 
+        f.forEach((x,i)=>{ data.push([i+1, x.name, x.isSib?'أخ/أخت':'', x.ph]); }); 
         let wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(data), "التقرير"); XLSX.writeFile(wb, `تقرير_${c.name}_${s.name}.xlsx`); 
+    } catch(e) { customAlert("تأكد من توفر الاتصال بالإنترنت لتحميل ملف الإكسل", "error"); }
+}
+
+function generateDriverReport() {
+    let rCode = document.getElementById('rep-driver').value; 
+    if(!rCode) { document.getElementById('report-list').innerHTML=''; return; }
+    let f = db.students.filter(s => s.regionCode === rCode).map(s => ({...s, isSib:false}));
+    db.students.forEach(m => { 
+        (m.siblings||[]).forEach(sib => { 
+            if(m.regionCode === rCode) f.push({name:sib.name, isSib:true, mName:m.name}); 
+        }); 
+    });
+    f.sort((a,b)=>a.name.localeCompare(b.name,'ar')); 
+    document.getElementById('report-list').innerHTML = f.map((s,i)=>`<div class="list-item"><b>${i+1}.</b> ${s.name} ${s.isSib?`<small style="color:red;">(أخ لـ ${s.mName})</small>`:''}</div>`).join('');
+}
+
+function exportDriverExcel() { 
+    try {
+        let rCode = document.getElementById('rep-driver').value; 
+        let reg = db.regions.find(x => x.code === rCode); 
+        if(!reg) return customAlert('اختر خط النقل أولاً', 'warning');
+        
+        let f = db.students.filter(x => x.regionCode === rCode).map(x => ({...x, isSib:false, ph:x.phone}));
+        db.students.forEach(m => { 
+            (m.siblings||[]).forEach(sib => { 
+                if(m.regionCode === rCode) f.push({name:sib.name, isSib:true, ph:m.phone}); 
+            }); 
+        });
+        f.sort((a,b)=>a.name.localeCompare(b.name,'ar'));
+        
+        let data = [[`تقرير خط النقل: ${reg.name} - السائق: ${reg.driver}`],["التسلسل","اسم الطالب","ملاحظة","الموبايل"]];
+        f.forEach((x,i)=>{ data.push([i+1, x.name, x.isSib?'أخ/أخت':'', x.ph||'']); }); 
+        let wb = XLSX.utils.book_new(); 
+        XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(data), "تقرير السائق"); 
+        XLSX.writeFile(wb, `خط_${reg.driver}.xlsx`); 
     } catch(e) { customAlert("تأكد من توفر الاتصال بالإنترنت لتحميل ملف الإكسل", "error"); }
 }
 
@@ -458,6 +625,7 @@ function printReceipt() {
     let s = db.students.find(x => x.id === currentStudentId);
     let c = db.classes.find(x => x.id == s.classId);
     let sc = c ? c.sections.find(x => x.id == s.sectionId) : null;
+    let totTuition = s.tuition + (s.siblings||[]).reduce((a,b)=>a+(b.fee||0),0);
     let p = s.payments.reduce((a, b) => a + b.amount, 0);
 
     let siblingsHtml = '';
@@ -490,7 +658,7 @@ function printReceipt() {
                 <td style="padding:10px;">المبلغ الكلي</td><td>الواصل (المسدد)</td><td colspan="2">المتبقي (الذمة)</td>
             </tr>
             <tr>
-                <td style="padding:10px; font-size:18px;">${s.tuition.toLocaleString()}</td><td style="font-size:18px;">${p.toLocaleString()}</td><td colspan="2" style="font-size:18px; color:red;">${(s.tuition - p).toLocaleString()}</td>
+                <td style="padding:10px; font-size:18px;">${totTuition.toLocaleString()}</td><td style="font-size:18px;">${p.toLocaleString()}</td><td colspan="2" style="font-size:18px; color:red;">${(totTuition - p).toLocaleString()}</td>
             </tr>
         </table>
         <table style="width:100%; border-collapse:collapse; text-align:center; font-weight:bold; border:1px solid #000;" border="1">
@@ -518,7 +686,11 @@ function printReceipt() {
 
 function exportStudentExcel() { 
     try {
-        let s=db.students.find(x=>x.id===currentStudentId), c=db.classes.find(x=>x.id==s.classId), sc=c?c.sections.find(x=>x.id==s.sectionId):null, p=s.payments.reduce((a,b)=>a+b.amount,0); let data=[["العلاقة","الاسم","القيد","الموبايل","الصف","الشعبة","الكلي","الواصل","المتبقي"],["الرئيسي",s.name,s.regId||'',s.phone||'',c?c.name:'',sc?sc.name:'',s.tuition,p,s.tuition-p]]; if(s.siblings){s.siblings.forEach(sib=>{let xC=db.classes.find(y=>y.id==sib.classId), xS=xC?xC.sections.find(y=>y.id==sib.sectionId):null; data.push(["أخ/أخت",sib.name,sib.regId||'',"-",xC?xC.name:'',xS?xS.name:'',"","-","-"]);});} data.push([],["الدفعات","التاريخ","المبلغ"]); s.payments.forEach((py,i)=>data.push([`دفعة ${i+1}`,py.date,py.amount])); 
+        let s=db.students.find(x=>x.id===currentStudentId), c=db.classes.find(x=>x.id==s.classId), sc=c?c.sections.find(x=>x.id==s.sectionId):null, p=s.payments.reduce((a,b)=>a+b.amount,0); 
+        let totTuition = s.tuition + (s.siblings||[]).reduce((a,b)=>a+(b.fee||0),0);
+        let data=[["العلاقة","الاسم","القيد","الموبايل","الصف","الشعبة","الكلي","الواصل","المتبقي"],["الرئيسي",s.name,s.regId||'',s.phone||'',c?c.name:'',sc?sc.name:'',totTuition,p,totTuition-p]]; 
+        if(s.siblings){s.siblings.forEach(sib=>{let xC=db.classes.find(y=>y.id==sib.classId), xS=xC?xC.sections.find(y=>y.id==sib.sectionId):null; data.push(["أخ/أخت",sib.name,sib.regId||'',"-",xC?xC.name:'',xS?xS.name:'',"","-","-"]);});} 
+        data.push([],["الدفعات","التاريخ","المبلغ"]); s.payments.forEach((py,i)=>data.push([`دفعة ${i+1}`,py.date,py.amount])); 
         let wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(data),"الحساب"); XLSX.writeFile(wb,`الطالب_${s.name}.xlsx`); 
     } catch(e) { customAlert("تأكد من توفر الاتصال بالإنترنت لتحميل ملف الإكسل", "error"); }
 }
