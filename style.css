@@ -131,7 +131,6 @@ body.dark-mode .nav-btn.active { color: #a29bfe; }
     * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
 }
 
-/* التعديل الثالث: تصغير الحقول لتظهر في شاشة واحدة */
 #add-student-modal .modal-content,
 #add-sibling-modal .modal-content,
 #student-profile-modal .modal-content {
