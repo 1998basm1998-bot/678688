@@ -40,6 +40,14 @@
                         <span><b>صافي الصندوق الحالي:</b><br><small>(الإيرادات - الرواتب - المصروفات)</small></span>
                         <b id="dash-net">0</b>
                     </div>
+                    <div class="list-item flex-between mt-2" style="background:rgba(255,255,255,0.4); font-size:16px;">
+                        <span><b>الموجود فعلاً (القاصة):</b></span>
+                        <input type="number" id="dash-actual" class="glass-input m-0" style="width: 150px; text-align: center;" placeholder="أدخل المبلغ..." oninput="calcDifference()">
+                    </div>
+                    <div class="list-item flex-between mt-1" style="background:rgba(0,0,0,0.05); font-size:16px;">
+                        <span><b>الفرق المحاسبي:</b></span>
+                        <b id="dash-diff">0</b>
+                    </div>
                 </div>
             </div>
         </div>
@@ -59,7 +67,10 @@
             <div class="glass p-3 mb-3 pb-x">
                 <div class="flex-between mb-2">
                     <h3><i class="fas fa-users-cog"></i> الكادر والرواتب</h3>
-                    <button type="button" class="btn-3d success btn-small m-0" onclick="openAddStaffModal()"><i class="fas fa-plus"></i> إضافة موظف</button>
+                    <div class="flex-row">
+                        <button type="button" class="btn-3d warning btn-small m-0" onclick="openAddTeacherModal()"><i class="fas fa-chalkboard-teacher"></i> إضافة مدرس</button>
+                        <button type="button" class="btn-3d success btn-small m-0" onclick="openAddStaffModal()"><i class="fas fa-plus"></i> إضافة إداري</button>
+                    </div>
                 </div>
                 <div id="staff-list" class="list-container mt-2"></div>
             </div>
@@ -92,11 +103,15 @@
         <div id="tab-reports" class="tab-content">
             <div class="glass p-3 mb-3 pb-x">
                 <h3><i class="fas fa-file-excel"></i> التقارير والقوائم</h3>
-                <div class="grid-2 mt-1 mb-2">
+                <div class="grid-3 mt-1 mb-2">
                     <select id="rep-class" class="glass-input m-0" onchange="updateRepSectionDropdown()"></select>
                     <select id="rep-section" class="glass-input m-0" onchange="generateReport()"><option value="">اختر الشعبة</option></select>
+                    <select id="rep-driver" class="glass-input m-0" onchange="generateDriverReport()"><option value="">اختر خط النقل</option></select>
                 </div>
-                <button type="button" class="btn-3d success w-100 mb-2" onclick="exportReportExcel()"><i class="fas fa-download"></i> تصدير إكسل</button>
+                <div class="grid-2 mb-2">
+                    <button type="button" class="btn-3d success w-100" onclick="exportReportExcel()"><i class="fas fa-download"></i> كشف الصف (إكسل)</button>
+                    <button type="button" class="btn-3d warning w-100" onclick="exportDriverExcel()"><i class="fas fa-bus"></i> كشف السائق (إكسل)</button>
+                </div>
                 <div id="report-list" class="list-container"></div>
             </div>
         </div>
@@ -137,7 +152,16 @@
                     <input type="text" id="new-class-name" class="glass-input m-0" placeholder="اسم الصف الجديد...">
                     <button type="button" class="btn-3d success" onclick="addClass()"><i class="fas fa-plus"></i></button>
                 </div>
-                <div id="classes-list" class="mt-2 list-container"></div>
+                <div id="classes-list" class="mt-2 list-container mb-3"></div>
+                <hr style="opacity:0.2; margin-bottom:15px;">
+                <div class="flex-between mb-2">
+                    <h3 class="m-0"><i class="fas fa-book"></i> إدارة المواد الدراسية</h3>
+                </div>
+                <div class="flex-row mt-2">
+                    <input type="text" id="new-subject-name" class="glass-input m-0" placeholder="اسم المادة الجديدة...">
+                    <button type="button" class="btn-3d success" onclick="addSubject()"><i class="fas fa-plus"></i></button>
+                </div>
+                <div id="subjects-list" class="mt-2 list-container"></div>
             </div>
         </div>
 
@@ -205,6 +229,7 @@
             <input type="text" id="sib-name" class="glass-input" placeholder="الاسم الثلاثي للأخ">
             <select id="sib-class" class="glass-input" onchange="updateSibSectionDropdown()"></select>
             <select id="sib-section" class="glass-input"><option value="">اختر الشعبة</option></select>
+            <input type="number" id="sib-fee" class="glass-input" placeholder="قسط الأخ (بعد الخصم) (د.ع)">
             <button type="button" class="btn-3d success w-100 mt-2" onclick="saveSiblingTemp()"><i class="fas fa-check"></i> تأكيد وإضافة</button>
         </div>
     </div>
@@ -265,11 +290,46 @@
     <div id="add-staff-modal" class="modal">
         <div class="modal-content glass">
             <span class="close-btn" onclick="hideModal('add-staff-modal')">&times;</span>
-            <h3 id="staff-modal-title"><i class="fas fa-user-tie"></i> إضافة / تعديل موظف</h3>
+            <h3 id="staff-modal-title"><i class="fas fa-user-tie"></i> إضافة / تعديل إداري</h3>
             <input type="text" id="staff-name" class="glass-input mt-2" placeholder="الاسم الكامل">
-            <input type="text" id="staff-role" class="glass-input" placeholder="المنصب (مثال: مدرس كيمياء، حارس)">
-            <input type="number" id="staff-salary" class="glass-input" placeholder="الراتب المتفق عليه (د.ع)">
-            <button type="button" class="btn-3d success w-100" onclick="saveStaff()"><i class="fas fa-save"></i> حفظ الموظف</button>
+            <input type="text" id="staff-role" class="glass-input" placeholder="المنصب (مثال: مدير، حارس)">
+            <input type="number" id="staff-salary" class="glass-input" placeholder="الراتب المقطوع (د.ع)">
+            <button type="button" class="btn-3d success w-100" onclick="saveStaff()"><i class="fas fa-save"></i> حفظ الإداري</button>
+        </div>
+    </div>
+
+    <div id="add-teacher-modal" class="modal">
+        <div class="modal-content glass">
+            <span class="close-btn" onclick="hideModal('add-teacher-modal')">&times;</span>
+            <h3 id="teacher-modal-title"><i class="fas fa-chalkboard-teacher"></i> إضافة / تعديل مدرس</h3>
+            <input type="text" id="teacher-name" class="glass-input mt-2" placeholder="الاسم الكامل">
+            <input type="text" id="teacher-role" class="glass-input" placeholder="الاختصاص (مثال: مدرس كيمياء)">
+            <input type="number" id="teacher-year" class="glass-input" placeholder="سنة التعيين (مثال: 2018)">
+            <button type="button" class="btn-3d warning w-100" onclick="saveTeacher()"><i class="fas fa-save"></i> حفظ المدرس</button>
+        </div>
+    </div>
+
+    <div id="pay-teacher-modal" class="modal" style="z-index: 2000;">
+        <div class="modal-content glass">
+            <span class="close-btn" onclick="hideModal('pay-teacher-modal')">&times;</span>
+            <h3><i class="fas fa-hand-holding-usd"></i> صرف راتب مدرس (نظام تفاعلي)</h3>
+            <div class="grid-2 mt-2 mb-1 text-center">
+                <div class="glass p-2">سنوات الخدمة<br><b id="teach-pay-years" style="color:#3498db;">0</b></div>
+                <div class="glass p-2">سعر المحاضرة<br><b id="teach-pay-price" style="color:#2ecc71;">0</b></div>
+            </div>
+            <div class="grid-2">
+                <input type="number" id="teach-pay-lecs" class="glass-input" placeholder="المحاضرات (أسبوعياً)" oninput="calcTeacherSalary()">
+                <input type="number" id="teach-pay-stds" class="glass-input" placeholder="معدل الطلاب (كثافة)" oninput="calcTeacherSalary()">
+                <input type="number" id="teach-pay-eval" class="glass-input" placeholder="التقييم (من 150)" oninput="calcTeacherSalary()">
+                <input type="number" id="teach-pay-bonus" class="glass-input" placeholder="مكافأة إضافية (إن وجد)" oninput="calcTeacherSalary()">
+            </div>
+            <input type="number" id="teach-pay-deduct" class="glass-input" placeholder="الخصم (إن وجد)" oninput="calcTeacherSalary()">
+            <input type="date" id="teach-pay-date" class="glass-input">
+            <div class="list-item flex-between mb-2 mt-1" style="background:rgba(231, 76, 60, 0.1); border-color:#e74c3c;">
+                <span style="font-weight:bold;">الصافي المستحق:</span>
+                <b id="teach-pay-net" style="color:#e74c3c; font-size:20px;">0</b>
+            </div>
+            <button type="button" class="btn-3d success w-100" onclick="submitTeacherPayment()"><i class="fas fa-check"></i> تأكيد الدفع</button>
         </div>
     </div>
 
