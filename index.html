@@ -20,7 +20,7 @@
             <h2><i class="fas fa-school"></i> أهلاً بك في النظام</h2>
             <p>يرجى إدخال بيانات المدرسة للبدء</p>
             <input type="text" id="setup-school-name" class="glass-input" placeholder="اسم المدرسة (مثال: ثانوية هبة الرحمن)">
-            <input type="date" id="setup-school-date" class="glass-input">
+            <input type="text" id="setup-school-date" class="glass-input" placeholder="العام الدراسي (مثال: 2026-2027)">
             <button type="button" class="btn-3d success w-100 mt-2" onclick="saveSetup()"><i class="fas fa-sign-in-alt"></i> الدخول للنظام</button>
         </div>
     </div>
@@ -136,7 +136,7 @@
             <div class="glass p-3 mb-3">
                 <h3><i class="fas fa-edit"></i> تعديل بيانات المدرسة</h3>
                 <input type="text" id="edit-school-name" class="glass-input" placeholder="اسم المدرسة">
-                <input type="date" id="edit-school-date" class="glass-input">
+                <input type="text" id="edit-school-date" class="glass-input" placeholder="العام الدراسي (مثال: 2026-2027)">
                 <button type="button" class="btn-3d success w-100 mt-1" onclick="updateSchool()"><i class="fas fa-save"></i> حفظ التعديل</button>
             </div>
             <div class="glass p-3 mb-3 pb-x">
@@ -202,6 +202,7 @@
                 <input type="text" id="std-reg" class="glass-input" placeholder="رقم القيد">
                 <input type="text" id="std-name" class="glass-input" placeholder="الاسم الثلاثي للطالب">
                 <input type="text" id="std-phone" class="glass-input" placeholder="رقم الموبايل">
+                <input type="text" id="std-notes" class="glass-input" placeholder="ملاحظات (اختياري)">
                 <input type="number" id="std-fee" class="glass-input" step="0.25" placeholder="القسط الكلي المقرر (د.ع)">
                 <input type="text" id="std-reg-code" class="glass-input" placeholder="ادخل رمز منطقة النقل" onkeyup="checkRegionCode()">
             </div>
@@ -241,6 +242,7 @@
                 <div>
                     <h2 id="prof-name" style="color: #8e44ad;"></h2>
                     <div id="prof-details" style="font-size: 14px; font-weight:bold; opacity: 0.8; margin-top: 5px;"></div>
+                    <div id="prof-notes" style="font-size: 13px; font-weight:bold; color: #e67e22; margin-top: 5px;"></div>
                 </div>
                 <span class="glass p-1">القيد: <b id="prof-reg"></b></span>
             </div>
@@ -251,9 +253,10 @@
                 <div class="glass p-2" style="color: #e74c3c;">المتبقي<br><b id="prof-rem">0</b></div>
             </div>
 
-            <div class="grid-2 mb-2">
+            <div class="grid-3 mb-2">
                 <button type="button" class="btn-3d success" onclick="showModal('payment-modal')"><i class="fas fa-money-bill-wave"></i> استلام قسط</button>
-                <button type="button" class="btn-3d warning" onclick="openGrades()"><i class="fas fa-star"></i> سجل الدرجات</button>
+                <button type="button" class="btn-3d warning" onclick="openGrades()"><i class="fas fa-star"></i> الدرجات</button>
+                <button type="button" class="btn-3d" style="background:#34495e;" onclick="openPromoteModal()"><i class="fas fa-level-up-alt"></i> ترحيل</button>
             </div>
 
             <div class="mb-2"><h4>سجل الدفعات المستلمة:</h4><div id="payments-history" class="list-container mt-1"></div></div>
@@ -341,6 +344,18 @@
             <input type="number" id="exp-amount" class="glass-input" placeholder="المبلغ المصروف (د.ع)">
             <input type="date" id="exp-date" class="glass-input">
             <button type="button" class="btn-3d danger w-100 mt-2" onclick="saveExpense()"><i class="fas fa-save"></i> تقييد المصروف</button>
+        </div>
+    </div>
+
+    <div id="promote-modal" class="modal" style="z-index: 2000;">
+        <div class="modal-content glass">
+            <span class="close-btn" onclick="hideModal('promote-modal')">&times;</span>
+            <h3><i class="fas fa-level-up-alt"></i> ترحيل الطالب للعام الجديد</h3>
+            <p style="font-size: 14px; margin-bottom: 10px; color: #e74c3c;">تنبيه: سيتم تصفير الدفعات والدرجات للعام الجديد ليتم احتساب الذمة كاملة.</p>
+            <select id="prom-class" class="glass-input" onchange="updateDropdown('prom-class', 'prom-section')"></select>
+            <select id="prom-section" class="glass-input"><option value="">اختر الشعبة</option></select>
+            <input type="number" id="prom-fee" class="glass-input" placeholder="القسط الجديد الكلي (د.ع)">
+            <button type="button" class="btn-3d success w-100 mt-2" onclick="submitPromote()"><i class="fas fa-check"></i> تأكيد الترحيل</button>
         </div>
     </div>
 
