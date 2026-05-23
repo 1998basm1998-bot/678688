@@ -91,8 +91,8 @@
                 <h2><i class="fas fa-calendar-day"></i> خلاصة اليوم</h2>
                 <input type="date" id="daily-date-filter" class="glass-input mt-2" onchange="renderDaily()">
                 <div class="grid-3 mt-2">
-                    <div class="glass p-2">الإيرادات<br><b id="daily-in" style="color:#2ecc71; font-size:18px;">0</b></div>
-                    <div class="glass p-2">المصروفات<br><b id="daily-out" style="color:#e74c3c; font-size:18px;">0</b></div>
+                    <div class="glass p-2">الإيرادات اليومية<br><b id="daily-in" style="color:#2ecc71; font-size:18px;">0</b></div>
+                    <div class="glass p-2">المصروفات اليومية<br><b id="daily-out" style="color:#e74c3c; font-size:18px;">0</b></div>
                     <div class="glass p-2">الصافي<br><b id="daily-net" style="color:#3498db; font-size:18px;">0</b></div>
                 </div>
                 <h4 class="mt-3 text-right">تفاصيل الحركة لهذا اليوم:</h4>
@@ -139,6 +139,20 @@
                 <input type="text" id="edit-school-date" class="glass-input" placeholder="العام الدراسي (مثال: 2026-2027)">
                 <button type="button" class="btn-3d success w-100 mt-1" onclick="updateSchool()"><i class="fas fa-save"></i> حفظ التعديل</button>
             </div>
+            
+            <div class="glass p-3 mb-3">
+                <h3><i class="fas fa-cogs"></i> إدارة النظام المتقدمة</h3>
+                <div class="grid-2 mt-2 mb-2">
+                    <button type="button" class="btn-3d" style="background:#2c3e50;" onclick="downloadBackup()"><i class="fas fa-download"></i> تنزيل نسخة احتياطية</button>
+                    <button type="button" class="btn-3d" style="background:#27ae60;" onclick="document.getElementById('backup-file').click()"><i class="fas fa-upload"></i> رفع نسخة احتياطية</button>
+                    <input type="file" id="backup-file" style="display:none" accept=".json" onchange="restoreBackup(event)">
+                </div>
+                <div class="grid-2">
+                    <button type="button" class="btn-3d danger w-100" onclick="showModal('recycle-bin-modal'); renderRecycleBin();"><i class="fas fa-trash-restore"></i> سلة المحذوفات</button>
+                    <button type="button" class="btn-3d warning w-100" onclick="bulkPromote()"><i class="fas fa-level-up-alt"></i> ترحيل كافة الطلاب</button>
+                </div>
+            </div>
+
             <div class="glass p-3 mb-3 pb-x">
                 <div class="flex-between mb-3">
                     <h3 class="m-0"><i class="fas fa-map-marked-alt"></i> المناطق وخطوط النقل</h3>
@@ -201,7 +215,7 @@
                 <select id="std-section" class="glass-input"><option value="">اختر الشعبة</option></select>
                 <input type="text" id="std-reg" class="glass-input" placeholder="رقم القيد">
                 <input type="text" id="std-name" class="glass-input" placeholder="الاسم الثلاثي للطالب">
-                <input type="text" id="std-phone" class="glass-input" placeholder="رقم الموبايل">
+                <input type="text" id="std-phone" class="glass-input" placeholder="رقم الموبايل (10 أرقام فقط)">
                 <input type="text" id="std-notes" class="glass-input" placeholder="ملاحظات (اختياري)">
                 <input type="number" id="std-fee" class="glass-input" step="0.25" placeholder="القسط الكلي المقرر (د.ع)">
                 <input type="text" id="std-reg-code" class="glass-input" placeholder="ادخل رمز منطقة النقل" onkeyup="checkRegionCode()">
@@ -244,19 +258,19 @@
                     <div id="prof-details" style="font-size: 14px; font-weight:bold; opacity: 0.8; margin-top: 5px;"></div>
                     <div id="prof-notes" style="font-size: 13px; font-weight:bold; color: #e67e22; margin-top: 5px;"></div>
                 </div>
-                <span class="glass p-1">القيد: <b id="prof-reg"></b></span>
+                <div style="font-size: 20px; font-weight: bold; color: #fff; background: #e74c3c; padding: 5px 20px; border-radius: 10px; margin-right: 20px; margin-top: 10px; box-shadow: 0 4px 10px rgba(231,76,60,0.4);" id="prof-reg"></div>
             </div>
             
             <div class="grid-3 mt-2 mb-2 text-center">
-                <div class="glass p-2">الكلي<br><b id="prof-total">0</b></div>
-                <div class="glass p-2" style="color: #2ecc71;">الواصل<br><b id="prof-paid">0</b></div>
-                <div class="glass p-2" style="color: #e74c3c;">المتبقي<br><b id="prof-rem">0</b></div>
+                <div class="glass p-2" style="background: rgba(52, 152, 219, 0.2); border-color: #3498db; color: #3498db;">الكلي<br><b id="prof-total" style="font-size:18px;">0</b></div>
+                <div class="glass p-2" style="background: rgba(46, 204, 113, 0.2); border-color: #2ecc71; color: #2ecc71;">الواصل<br><b id="prof-paid" style="font-size:18px;">0</b></div>
+                <div class="glass p-2" style="background: rgba(231, 76, 60, 0.2); border-color: #e74c3c; color: #e74c3c;">المتبقي<br><b id="prof-rem" style="font-size:18px;">0</b></div>
             </div>
 
             <div class="grid-3 mb-2">
                 <button type="button" class="btn-3d success" onclick="showModal('payment-modal')"><i class="fas fa-money-bill-wave"></i> استلام قسط</button>
                 <button type="button" class="btn-3d warning" onclick="openGrades()"><i class="fas fa-star"></i> الدرجات</button>
-                <button type="button" class="btn-3d" style="background:#34495e;" onclick="openPromoteModal()"><i class="fas fa-level-up-alt"></i> ترحيل</button>
+                <button type="button" class="btn-3d" style="background:#34495e;" onclick="bulkPromote()"><i class="fas fa-level-up-alt"></i> ترحيل الكل</button>
             </div>
 
             <div class="mb-2"><h4>سجل الدفعات المستلمة:</h4><div id="payments-history" class="list-container mt-1"></div></div>
@@ -274,7 +288,7 @@
                 <input type="date" id="pay-date" class="glass-input m-0">
                 <input type="number" id="pay-amount" class="glass-input m-0" placeholder="المبلغ المستلم">
             </div>
-            <button type="button" class="btn-3d success w-100" onclick="submitPayment()"><i class="fas fa-check"></i> حفظ وصل القبض</button>
+            <button type="button" class="btn-3d success w-100" onclick="submitPayment()"><i class="fas fa-print"></i> حفظ وطباعة الوصل</button>
         </div>
     </div>
 
@@ -344,6 +358,18 @@
             <input type="number" id="exp-amount" class="glass-input" placeholder="المبلغ المصروف (د.ع)">
             <input type="date" id="exp-date" class="glass-input">
             <button type="button" class="btn-3d danger w-100 mt-2" onclick="saveExpense()"><i class="fas fa-save"></i> تقييد المصروف</button>
+        </div>
+    </div>
+
+    <div id="recycle-bin-modal" class="modal" style="z-index: 2000;">
+        <div class="modal-content glass large">
+            <span class="close-btn" onclick="hideModal('recycle-bin-modal')">&times;</span>
+            <h3><i class="fas fa-trash-alt"></i> سلة المحذوفات</h3>
+            <div class="flex-between mt-2 mb-2">
+                <button type="button" class="btn-3d danger" onclick="emptyRecycleBin()"><i class="fas fa-minus-circle"></i> حذف الكل نهائياً</button>
+                <button type="button" class="btn-3d success" onclick="restoreAllRecycleBin()"><i class="fas fa-undo"></i> استرجاع الكل</button>
+            </div>
+            <div id="recycle-bin-list" class="list-container"></div>
         </div>
     </div>
 
