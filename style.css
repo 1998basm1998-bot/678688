@@ -127,13 +127,16 @@ body.dark-mode .nav-btn.active { color: #a29bfe; }
     body > *:not(#print-area) { display: none !important; }
     #print-area, #print-area * { display: block; visibility: visible; color:#000 !important; }
     #print-area { display: block !important; position: absolute; left: 0; top: 0; width: 100%; direction: rtl; }
-    @page { size: A4 landscape; margin: 10mm; }
+    @page { size: A4 portrait; margin: 10mm; }
     * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+    .receipt-wrapper { height: 48vh; overflow: hidden; page-break-inside: avoid; }
+    .receipt-divider { border-top: 2px dashed #000; margin: 1vh 0; height: 1vh; }
 }
 
 #add-student-modal .modal-content,
 #add-sibling-modal .modal-content,
-#student-profile-modal .modal-content {
+#student-profile-modal .modal-content,
+#recycle-bin-modal .modal-content {
     padding: 10px 15px !important;
     max-height: 95vh;
     overflow-y: auto;
@@ -164,8 +167,8 @@ body.dark-mode .nav-btn.active { color: #a29bfe; }
     padding: 6px !important;
 }
 .modal-content .btn-3d { margin-bottom: 5px !important; padding: 6px !important; font-size: 13px !important; }
-#siblings-temp-list, #payments-history {
-    max-height: 80px !important;
+#siblings-temp-list, #payments-history, #recycle-bin-list {
+    max-height: 120px !important;
     overflow-y: auto !important;
     margin-bottom: 5px !important;
 }
