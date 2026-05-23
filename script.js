@@ -24,7 +24,7 @@ if (!db || typeof db !== 'object') {
             { id: 2, name: 'حي المعلمين', driver: 'محمد جاسم', phone: '07801234567', code: '102' }
         ],
         students: [
-            { id: 1001, classId: 1, sectionId: 11, regId: '1055', name: 'علي حسين كاظم', phone: '07711111111', notes: '', tuition: 1500000, regionCode: '101', payments: [{amount: 500000, date: todayISO}], grades: {}, siblings: [
+            { id: 1001, classId: 1, sectionId: 11, regId: '1055', name: 'علي حسين كاظم', phone: '0771111111', notes: '', tuition: 1500000, regionCode: '101', payments: [{amount: 500000, date: todayISO}], grades: {}, siblings: [
                 { regId: '1056', name: 'محمد حسين كاظم', classId: 2, sectionId: 21, fee: 1000000 }
             ]}
         ],
@@ -34,7 +34,8 @@ if (!db || typeof db !== 'object') {
         ],
         expenses: [
             { id: 1, desc: 'صيانة وتصليح', amount: 50000, date: todayISO }
-        ]
+        ],
+        recycleBin: []
     };
     localStorage.setItem('school_erp_final_v1', JSON.stringify(db));
 }
@@ -94,6 +95,15 @@ function initApp() {
     if(!db.staff) db.staff = []; 
     if(!db.expenses) db.expenses = [];
     if(!db.settings) db.settings = { subjects: [...defaultSubjects] };
+    if(!db.recycleBin) db.recycleBin = [];
+
+    // تنظيف سلة المحذوفات (حذف نهائي بعد 15 يوم)
+    let now = Date.now();
+    db.recycleBin = db.recycleBin.filter(s => {
+        let diffDays = (now - (s.deletedAt || now)) / (1000 * 3600 * 24);
+        return diffDays <= 15;
+    });
+    saveDB();
     
     document.getElementById('display-school-name').innerHTML = `<i class="fas fa-university"></i> ${db.schoolName}`;
     document.getElementById('edit-school-name').value = db.schoolName; 
@@ -140,6 +150,50 @@ function applyTheme(theme) { document.body.classList.toggle('dark-mode', theme =
 function showModal(id) { document.getElementById(id).classList.add('active'); }
 function hideModal(id) { document.getElementById(id).classList.remove('active'); }
 
+// اختصارات لوحة المفاتيح
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+        document.querySelectorAll('.modal.active').forEach(m => m.classList.remove('active'));
+    }
+    if (e.key === 'Enter') {
+        let activeModal = document.querySelector('.modal.active');
+        if (activeModal && !e.target.matches('textarea')) {
+            let btn = activeModal.querySelector('.btn-3d.success');
+            if(btn) btn.click();
+        }
+    }
+});
+
+// إدارة النسخ الاحتياطية
+function downloadBackup() {
+    let dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(db));
+    let dlAnchorElem = document.createElement('a');
+    dlAnchorElem.setAttribute("href", dataStr);
+    dlAnchorElem.setAttribute("download", `نسخة_احتياطية_${new Date().toLocaleDateString('en-GB').replace(/\//g,'-')}.json`);
+    dlAnchorElem.click();
+}
+function restoreBackup(event) {
+    let file = event.target.files[0];
+    if(!file) return;
+    let reader = new FileReader();
+    reader.onload = function(e) {
+        try {
+            let importedDB = JSON.parse(e.target.result);
+            if(importedDB && importedDB.students) {
+                db = importedDB;
+                saveDB();
+                customAlert('تم استعادة النسخة الاحتياطية بنجاح!', 'success');
+                setTimeout(() => location.reload(), 1500);
+            } else {
+                customAlert('ملف النسخة الاحتياطية غير صالح', 'error');
+            }
+        } catch(err) {
+            customAlert('حدث خطأ أثناء قراءة الملف', 'error');
+        }
+    };
+    reader.readAsText(file);
+}
+
 // ============ 4. الإعدادات (الصفوف والمناطق والمواد الديناميكية) ============
 function addClass() { let n=document.getElementById('new-class-name').value; if(!n)return; db.classes.push({id:Date.now(), name:n, sections:[]}); saveDB(); document.getElementById('new-class-name').value=''; initApp(); }
 function deleteClass(id) { customConfirm('تأكيد حذف الصف بكافة شعبه؟', r=>{ if(r){db.classes=db.classes.filter(c=>c.id!==id); saveDB(); initApp();}}); }
@@ -151,6 +205,7 @@ function renderClasses() {
 function addRegion() {
     let n=document.getElementById('reg-name').value, d=document.getElementById('reg-driver').value, p=document.getElementById('reg-phone').value, c=document.getElementById('reg-code').value;
     if(!n||!c) return customAlert("الاسم والرمز مطلوبان", 'warning');
+    if (p && !/^\d{10}$/.test(p)) return customAlert('رقم الهاتف يجب أن يتكون من 10 أرقام بالضبط', 'error');
     db.regions.push({id:Date.now(), name:n, driver:d, phone:p, code:c}); saveDB(); renderRegions(); ['reg-name','reg-driver','reg-phone','reg-code'].forEach(id=>document.getElementById(id).value='');
 }
 function deleteRegion(id) { customConfirm('تأكيد الحذف؟', r=>{ if(r){db.regions=db.regions.filter(x=>x.id!==id); saveDB(); renderRegions();} });}
@@ -269,10 +324,14 @@ function deleteSiblingDirect(mainId, sibIdx) {
 
 function saveSiblingTemp() { 
     let n=document.getElementById('sib-name').value; 
+    let reg=document.getElementById('sib-reg').value; 
     if(!n) return customAlert('اسم الأخ مطلوب', 'warning'); 
     
+    let isDuplicate = db.students.some(x => (x.name === n || (reg && x.regId === reg)) && x.id !== editingDirectSibMainId);
+    if(isDuplicate) return customAlert('اسم الطالب أو رقم القيد موجود مسبقاً!', 'error');
+
     let sibObj = {
-        regId: document.getElementById('sib-reg').value, 
+        regId: reg, 
         name: n, 
         classId: document.getElementById('sib-class').value, 
         sectionId: document.getElementById('sib-section').value,
@@ -308,7 +367,14 @@ function renderTempSiblings() {
 
 function saveStudent() {
     let n=document.getElementById('std-name').value; if(!n) return customAlert('الاسم الثلاثي للطالب مطلوب','error');
-    let d = { classId:document.getElementById('std-class').value, sectionId:document.getElementById('std-section').value, regId:document.getElementById('std-reg').value, name:n, phone:document.getElementById('std-phone').value, notes:document.getElementById('std-notes').value, tuition:parseFloat(document.getElementById('std-fee').value)||0, regionCode:document.getElementById('std-reg-code').value, siblings:[...tempSiblings] };
+    let ph=document.getElementById('std-phone').value;
+    let reg=document.getElementById('std-reg').value;
+    
+    if(ph && !/^\d{10}$/.test(ph)) return customAlert('رقم الموبايل يجب أن يتكون من 10 أرقام بالضبط', 'error');
+    let isDuplicate = db.students.some(x => (x.name === n || (reg && x.regId === reg)) && x.id !== editingStudentId);
+    if(isDuplicate) return customAlert('اسم الطالب أو رقم القيد مسجل مسبقاً!', 'error');
+
+    let d = { classId:document.getElementById('std-class').value, sectionId:document.getElementById('std-section').value, regId:reg, name:n, phone:ph, notes:document.getElementById('std-notes').value, tuition:parseFloat(document.getElementById('std-fee').value)||0, regionCode:document.getElementById('std-reg-code').value, siblings:[...tempSiblings] };
     if(editingStudentId){ let idx=db.students.findIndex(x=>x.id===editingStudentId); d.id=db.students[idx].id; d.payments=db.students[idx].payments; d.grades=db.students[idx].grades; db.students[idx]=d; if(typeof Swal !== 'undefined') Swal.fire({toast:true,position:'top-end',icon:'success',title:'تم التعديل',showConfirmButton:false,timer:1500}); } 
     else { d.id=Date.now(); d.payments=[]; d.grades={}; db.students.push(d); if(typeof Swal !== 'undefined') Swal.fire({toast:true,position:'top-end',icon:'success',title:'تم الإضافة',showConfirmButton:false,timer:1500}); }
     saveDB(); hideModal('add-student-modal'); renderStudents(); renderDual(); if(typeof renderStatistics === 'function') renderStatistics();
@@ -337,12 +403,63 @@ function renderStudents(filter="") {
     }); document.getElementById('students-list').innerHTML=html || '<div class="text-center mt-3">لا يوجد طلاب</div>';
 }
 
-function deleteStudent(id) { customConfirm("حذف الطالب نهائياً من النظام (مع كافة سجلاته)؟", r=>{ if(r){db.students=db.students.filter(s=>s.id!==id); saveDB(); renderStudents(); renderDual(); if(typeof renderStatistics === 'function') renderStatistics();} }); }
+function deleteStudent(id) { 
+    customConfirm("نقل الطالب إلى سلة المحذوفات؟", r=>{ 
+        if(r){
+            let s = db.students.find(x=>x.id===id);
+            s.deletedAt = Date.now();
+            if(!db.recycleBin) db.recycleBin = [];
+            db.recycleBin.push(s);
+            db.students = db.students.filter(x=>x.id!==id); 
+            saveDB(); renderStudents(); renderDual(); if(typeof renderStatistics === 'function') renderStatistics();
+        } 
+    }); 
+}
 
-// ============ 6. ملف الطالب المالي والدرجات (مع ديناميكية المواد) ============
+// ============ إدارة سلة المحذوفات ============
+function renderRecycleBin() {
+    if(!db.recycleBin) db.recycleBin = [];
+    document.getElementById('recycle-bin-list').innerHTML = db.recycleBin.map((s, i) => `
+        <div class="list-item flex-between">
+            <div><strong>${s.name}</strong><br><small>تاريخ الحذف: ${new Date(s.deletedAt).toLocaleDateString('en-GB')}</small></div>
+            <div class="flex-row">
+                <button class="btn-3d success btn-small m-0" onclick="restoreStudent(${i})"><i class="fas fa-undo"></i> استرجاع</button>
+                <button class="btn-3d danger btn-small m-0" onclick="hardDeleteStudent(${i})"><i class="fas fa-trash"></i> نهائي</button>
+            </div>
+        </div>
+    `).join('') || '<div class="text-center mt-3">السلة فارغة</div>';
+}
+function restoreStudent(idx) {
+    db.students.push(db.recycleBin[idx]);
+    db.recycleBin.splice(idx, 1);
+    saveDB(); renderRecycleBin(); renderStudents(); renderDual();
+}
+function hardDeleteStudent(idx) {
+    customConfirm("تأكيد الحذف النهائي؟ لا يمكن التراجع", r => {
+        if(r) { db.recycleBin.splice(idx, 1); saveDB(); renderRecycleBin(); }
+    });
+}
+function emptyRecycleBin() {
+    customConfirm("هل أنت متأكد من إفراغ السلة بالكامل نهائياً؟", r => {
+        if(r) { db.recycleBin = []; saveDB(); renderRecycleBin(); }
+    });
+}
+function restoreAllRecycleBin() {
+    if(!db.recycleBin || db.recycleBin.length === 0) return;
+    customConfirm("استرجاع كافة الطلاب المحذوفين للنظام؟", r => {
+        if(r) { 
+            db.students.push(...db.recycleBin); 
+            db.recycleBin = []; 
+            saveDB(); renderRecycleBin(); renderStudents(); renderDual(); 
+        }
+    });
+}
+
+// ============ 6. ملف الطالب المالي والدرجات ============
 function openProfile(id) {
     currentStudentId=id; let s=db.students.find(x=>x.id===id); let c=db.classes.find(x=>x.id==s.classId), sec=c?c.sections.find(x=>x.id==s.sectionId):null;
-    document.getElementById('prof-name').innerText=s.name; document.getElementById('prof-details').innerText=`الصف: ${c?c.name:'-'} | الشعبة: ${sec?sec.name:'-'} | موبايل: ${s.phone||'-'}`; document.getElementById('prof-reg').innerText=s.regId||'-';
+    document.getElementById('prof-name').innerText=s.name; document.getElementById('prof-details').innerText=`الصف: ${c?c.name:'-'} | الشعبة: ${sec?sec.name:'-'} | موبايل: ${s.phone||'-'}`; 
+    document.getElementById('prof-reg').innerText=s.regId||'-';
     document.getElementById('prof-notes').innerText = s.notes ? 'ملاحظات: ' + s.notes : '';
     updateFinance(s); showModal('student-profile-modal');
 }
@@ -355,7 +472,9 @@ function submitPayment() {
     let amt=parseFloat(document.getElementById('pay-amount').value), dt=document.getElementById('pay-date').value; 
     if(amt>0 && dt){ 
         let s=db.students.find(x=>x.id===currentStudentId); s.payments.push({amount:amt, date:dt}); saveDB(); document.getElementById('pay-amount').value=''; updateFinance(s); renderDual(); renderDaily(); 
+        hideModal('payment-modal');
         if(typeof Swal !== 'undefined') Swal.fire({toast:true, position:'top-end', icon:'success', title:'تم تسديد الدفعة', showConfirmButton:false, timer:1500}); 
+        setTimeout(() => printReceipt(), 500);
     } else { customAlert("يرجى إدخال المبلغ والتاريخ بشكل صحيح", "error"); }
 }
 function delPayment(i) { customConfirm('حذف الدفعة المحددة؟', r=>{ if(r){let s=db.students.find(x=>x.id===currentStudentId); s.payments.splice(i,1); saveDB(); updateFinance(s); renderDual(); renderDaily();} }); }
@@ -395,6 +514,16 @@ function submitPromote() {
     });
 }
 
+function bulkPromote() {
+    customConfirm("هل أنت متأكد من ترحيل كافة الطلاب للعام الجديد؟ (سيتم تصفير الدفعات والدرجات للجميع لتصبح ذممهم كاملة)", r => {
+        if (r) {
+            db.students.forEach(s => { s.payments = []; s.grades = {}; });
+            saveDB(); renderStudents(); renderDual();
+            if(typeof Swal !== 'undefined') Swal.fire({toast:true, position:'top-end', icon:'success', title:'تم ترحيل كافة الطلاب بنجاح', showConfirmButton:false, timer:2000});
+        }
+    });
+}
+
 function openGrades() {
     let s=db.students.find(x=>x.id===currentStudentId); if(!s.grades)s.grades={}; if(!s.grades.subNames)s.grades.subNames=[...db.settings.subjects];
     let subCount = db.settings.subjects.length;
@@ -411,7 +540,7 @@ function calcRow(i) { let get=id=>{let v=parseFloat(document.getElementById(id).
 function calcCols() { let cols=['m11','m12','m13','avg1','mid','m21','m22','m23','avg2','year','final','tot']; let subCount=db.settings.subjects.length; let vC=Array.from({length:subCount}).filter((_,i)=>document.getElementById(`g_sub_${i}`).value.trim()!=='').length||1; cols.forEach(c=>{ let sum=0, cnt=0; for(let i=0;i<subCount;i++){let v=parseFloat(document.getElementById(`g_${i}_${c}`).value); if(!isNaN(v)){sum+=v;cnt++;}} document.getElementById(`g_tot_${c}`).value=cnt>0?Math.round(sum):''; document.getElementById(`g_avg_${c}`).value=cnt>0?(sum/vC).toFixed(1).replace(/\.0$/,''):''; }); }
 function saveGrades() { let s=db.students.find(x=>x.id===currentStudentId); s.grades.subNames=[]; let subCount=db.settings.subjects.length; for(let i=0;i<subCount;i++){ s.grades.subNames.push(document.getElementById(`g_sub_${i}`).value); s.grades[i]={m11:document.getElementById(`g_${i}_m11`).value, m12:document.getElementById(`g_${i}_m12`).value, m13:document.getElementById(`g_${i}_m13`).value, avg1:document.getElementById(`g_${i}_avg1`).value, mid:document.getElementById(`g_${i}_mid`).value, m21:document.getElementById(`g_${i}_m21`).value, m22:document.getElementById(`g_${i}_m22`).value, m23:document.getElementById(`g_${i}_m23`).value, avg2:document.getElementById(`g_${i}_avg2`).value, year:document.getElementById(`g_${i}_year`).value, final:document.getElementById(`g_${i}_final`).value, tot:document.getElementById(`g_${i}_tot`).value}; } s.grades['footer']=document.getElementById('g_footer').value; saveDB(); if(typeof Swal !== 'undefined') Swal.fire({toast:true,position:'top-end',icon:'success',title:'تم حفظ الدرجات',showConfirmButton:false,timer:1500}); }
 
-// ============ 7. الرواتب والموظفين (تفاعلي وإداري) ============
+// ============ 7. الرواتب والموظفين ============
 function openAddStaffModal() { editingStaffId=null; document.getElementById('staff-modal-title').innerHTML='<i class="fas fa-user-plus"></i> إضافة موظف'; ['staff-name','staff-role','staff-salary'].forEach(id=>document.getElementById(id).value=''); showModal('add-staff-modal'); }
 function saveStaff() { let n=document.getElementById('staff-name').value, r=document.getElementById('staff-role').value, s=parseFloat(document.getElementById('staff-salary').value)||0; if(!n||s<=0) return customAlert('يرجى إدخال الاسم والراتب بشكل صحيح', 'error'); if(editingStaffId){ let idx=db.staff.findIndex(x=>x.id===editingStaffId); db.staff[idx].name=n; db.staff[idx].role=r; db.staff[idx].salary=s; } else { db.staff.push({ id:Date.now(), name:n, role:r, salary:s, isTeacher:false, payments:[] }); } saveDB(); hideModal('add-staff-modal'); renderStaff(); renderDual(); if(typeof Swal !== 'undefined') Swal.fire({toast:true, position:'top-end', icon:'success', title:'تم الحفظ', showConfirmButton:false, timer:1500}); }
 function editStaff(id) { editingStaffId=id; let s=db.staff.find(x=>x.id===id); document.getElementById('staff-modal-title').innerHTML='<i class="fas fa-edit"></i> تعديل موظف'; document.getElementById('staff-name').value=s.name; document.getElementById('staff-role').value=s.role; document.getElementById('staff-salary').value=s.salary; showModal('add-staff-modal'); }
@@ -586,9 +715,9 @@ function generateReport() {
     let cId=document.getElementById('rep-class').value, sId=document.getElementById('rep-section').value; 
     if(!cId||!sId){document.getElementById('report-list').innerHTML='';return;} 
     let f=db.students.filter(s=>s.classId==cId && s.sectionId==sId).map(s=>({...s, isSib:false})); 
-    db.students.forEach(m=>{ (m.siblings||[]).forEach(sib=>{ if(sib.classId==cId && sib.sectionId==sId) f.push({name:sib.name, isSib:true, mName:m.name}); }); }); 
+    db.students.forEach(m=>{ (m.siblings||[]).forEach(sib=>{ if(sib.classId==cId && sib.sectionId==sId) f.push({name:sib.name, regId:sib.regId, isSib:true, mName:m.name}); }); }); 
     f.sort((a,b)=>a.name.localeCompare(b.name,'ar')); 
-    document.getElementById('report-list').innerHTML=f.map((s,i)=>`<div class="list-item"><b>${i+1}.</b> ${s.name} ${s.isSib?`<small style="color:red;">(أخ لـ ${s.mName})</small>`:''}</div>`).join(''); 
+    document.getElementById('report-list').innerHTML=f.map((s,i)=>`<div class="list-item"><b>${i+1}.</b> ${s.name} ${s.regId?`<small>(قيد: ${s.regId})</small>`:''} ${s.isSib?`<small style="color:red;">(أخ لـ ${s.mName})</small>`:''}</div>`).join(''); 
 }
 
 function exportReportExcel() { 
@@ -597,10 +726,10 @@ function exportReportExcel() {
         let c=db.classes.find(x=>x.id==cId), s=c?c.sections.find(x=>x.id==sId):null; 
         if(!c||!s) return customAlert('اختر الصف والشعبة', 'warning'); 
         let f=db.students.filter(x=>x.classId==cId && x.sectionId==sId).map(x=>({...x, isSib:false, ph:x.phone})); 
-        db.students.forEach(m=>{ (m.siblings||[]).forEach(sib=>{ if(sib.classId==cId && sib.sectionId==sId) f.push({name:sib.name, isSib:true, ph:m.phone}); }); }); 
+        db.students.forEach(m=>{ (m.siblings||[]).forEach(sib=>{ if(sib.classId==cId && sib.sectionId==sId) f.push({name:sib.name, regId:sib.regId, isSib:true, ph:m.phone}); }); }); 
         f.sort((a,b)=>a.name.localeCompare(b.name,'ar')); 
-        let data=[[`تقرير الصف: ${c.name} - الشعبة: ${s.name}`],["التسلسل","اسم الطالب","ملاحظة","الموبايل"]]; 
-        f.forEach((x,i)=>{ data.push([i+1, x.name, x.isSib?'أخ/أخت':'', x.ph]); }); 
+        let data=[[`تقرير الصف: ${c.name} - الشعبة: ${s.name}`],["التسلسل","اسم الطالب","رقم القيد","ملاحظة","الموبايل"]]; 
+        f.forEach((x,i)=>{ data.push([i+1, x.name, x.regId||'', x.isSib?'أخ/أخت':'', x.ph||'']); }); 
         let wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(data), "التقرير"); XLSX.writeFile(wb, `تقرير_${c.name}_${s.name}.xlsx`); 
     } catch(e) { customAlert("تأكد من توفر الاتصال بالإنترنت لتحميل ملف الإكسل", "error"); }
 }
@@ -611,11 +740,11 @@ function generateDriverReport() {
     let f = db.students.filter(s => s.regionCode === rCode).map(s => ({...s, isSib:false}));
     db.students.forEach(m => { 
         (m.siblings||[]).forEach(sib => { 
-            if(m.regionCode === rCode) f.push({name:sib.name, isSib:true, mName:m.name}); 
+            if(m.regionCode === rCode) f.push({name:sib.name, regId:sib.regId, isSib:true, mName:m.name}); 
         }); 
     });
     f.sort((a,b)=>a.name.localeCompare(b.name,'ar')); 
-    document.getElementById('report-list').innerHTML = f.map((s,i)=>`<div class="list-item"><b>${i+1}.</b> ${s.name} ${s.isSib?`<small style="color:red;">(أخ لـ ${s.mName})</small>`:''}</div>`).join('');
+    document.getElementById('report-list').innerHTML = f.map((s,i)=>`<div class="list-item"><b>${i+1}.</b> ${s.name} ${s.regId?`<small>(قيد: ${s.regId})</small>`:''} ${s.isSib?`<small style="color:red;">(أخ لـ ${s.mName})</small>`:''}</div>`).join('');
 }
 
 function exportDriverExcel() { 
@@ -627,13 +756,13 @@ function exportDriverExcel() {
         let f = db.students.filter(x => x.regionCode === rCode).map(x => ({...x, isSib:false, ph:x.phone}));
         db.students.forEach(m => { 
             (m.siblings||[]).forEach(sib => { 
-                if(m.regionCode === rCode) f.push({name:sib.name, isSib:true, ph:m.phone}); 
+                if(m.regionCode === rCode) f.push({name:sib.name, regId:sib.regId, isSib:true, ph:m.phone}); 
             }); 
         });
         f.sort((a,b)=>a.name.localeCompare(b.name,'ar'));
         
-        let data = [[`تقرير خط النقل: ${reg.name} - السائق: ${reg.driver}`],["التسلسل","اسم الطالب","ملاحظة","الموبايل"]];
-        f.forEach((x,i)=>{ data.push([i+1, x.name, x.isSib?'أخ/أخت':'', x.ph||'']); }); 
+        let data = [[`تقرير خط النقل: ${reg.name} - السائق: ${reg.driver}`],["التسلسل","اسم الطالب","رقم القيد","ملاحظة","الموبايل"]];
+        f.forEach((x,i)=>{ data.push([i+1, x.name, x.regId||'', x.isSib?'أخ/أخت':'', x.ph||'']); }); 
         let wb = XLSX.utils.book_new(); 
         XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(data), "تقرير السائق"); 
         XLSX.writeFile(wb, `خط_${reg.driver}.xlsx`); 
@@ -670,32 +799,33 @@ function printReceipt() {
         siblingsHtml = s.siblings.map(sib => {
             let xC = db.classes.find(y => y.id == sib.classId);
             let xS = xC ? xC.sections.find(y => y.id == sib.sectionId) : null;
-            return `<tr><td style="padding:10px; color:#e74c3c;">أخ/أخت</td><td>${sib.name}</td><td>${sib.regId || '-'}</td><td>${xC ? xC.name : ''}</td><td>${xS ? xS.name : ''}</td></tr>`;
+            return `<tr><td style="padding:5px; color:#e74c3c;">أخ/أخت</td><td style="padding:5px;">${sib.name}</td><td style="padding:5px;">${sib.regId || '-'}</td><td style="padding:5px;">${xC ? xC.name : ''}</td><td style="padding:5px;">${xS ? xS.name : ''}</td></tr>`;
         }).join('');
     }
 
-    let html = `
-    <div style="font-family:Arial; padding:20px; border:2px solid #000; width:95%; margin:auto; direction:rtl;">
-        <div style="display:flex; justify-content:space-between; border-bottom:3px double #000; padding-bottom:15px; margin-bottom:15px;">
+    let generateHalf = (title) => `
+    <div class="receipt-wrapper" style="font-family:Arial; padding:10px 20px; width:95%; margin:auto; direction:rtl; box-sizing:border-box;">
+        <div style="text-align:center; font-size:15px; font-weight:bold; margin-bottom:5px; text-decoration:underline;">${title}</div>
+        <div style="display:flex; justify-content:space-between; border-bottom:3px double #000; padding-bottom:10px; margin-bottom:10px;">
             <div><b>التاريخ:</b><br>${new Date().toLocaleDateString('en-GB')}</div>
-            <h1 style="margin:0; color:#2c3e50;">${db.schoolName}</h1>
-            <div><b>القيد:</b><br>${s.regId || '----'}</div>
+            <h2 style="margin:0; color:#2c3e50;">${db.schoolName}</h2>
+            <div><b>رقم القيد:</b><br>${s.regId || '----'}</div>
         </div>
-        <table style="width:100%; border-collapse:collapse; text-align:center; font-weight:bold; border:2px solid #000; margin-bottom:15px;" border="1">
+        <table style="width:100%; border-collapse:collapse; text-align:center; font-weight:bold; border:2px solid #000; margin-bottom:10px;" border="1">
             <tr style="background:#ecf0f1; -webkit-print-color-adjust:exact;">
-                <td style="padding:10px;">علاقة</td><td>الاسم</td><td>القيد</td><td>الصف</td><td>الشعبة</td>
+                <td style="padding:5px;">علاقة</td><td style="padding:5px;">الاسم</td><td style="padding:5px;">القيد</td><td style="padding:5px;">الصف</td><td style="padding:5px;">الشعبة</td>
             </tr>
             <tr>
-                <td style="padding:10px;">الرئيسي</td><td>${s.name}</td><td>${s.regId || '-'}</td><td>${c ? c.name : ''}</td><td>${sc ? sc.name : ''}</td>
+                <td style="padding:5px;">الرئيسي</td><td style="padding:5px;">${s.name}</td><td style="padding:5px;">${s.regId || '-'}</td><td style="padding:5px;">${c ? c.name : ''}</td><td style="padding:5px;">${sc ? sc.name : ''}</td>
             </tr>
             ${siblingsHtml}
         </table>
-        <table style="width:100%; border-collapse:collapse; text-align:center; font-weight:bold; border:2px solid #000; margin-bottom:15px;" border="1">
+        <table style="width:100%; border-collapse:collapse; text-align:center; font-weight:bold; border:2px solid #000; margin-bottom:10px;" border="1">
             <tr style="background:#ecf0f1; -webkit-print-color-adjust:exact;">
-                <td style="padding:10px;">المبلغ الكلي</td><td>الواصل (المسدد)</td><td colspan="2">المتبقي (الذمة)</td>
+                <td style="padding:5px;">المبلغ الكلي</td><td style="padding:5px;">الواصل (المسدد)</td><td colspan="2" style="padding:5px;">المتبقي (الذمة)</td>
             </tr>
             <tr>
-                <td style="padding:10px; font-size:18px;">${totTuition.toLocaleString()}</td><td style="font-size:18px;">${p.toLocaleString()}</td><td colspan="2" style="font-size:18px; color:red;">${(totTuition - p).toLocaleString()}</td>
+                <td style="padding:5px; font-size:16px;">${totTuition.toLocaleString()}</td><td style="padding:5px; font-size:16px;">${p.toLocaleString()}</td><td colspan="2" style="padding:5px; font-size:16px; color:red;">${(totTuition - p).toLocaleString()}</td>
             </tr>
         </table>
         <table style="width:100%; border-collapse:collapse; text-align:center; font-weight:bold; border:1px solid #000;" border="1">
@@ -715,8 +845,16 @@ function printReceipt() {
                 <td>${s.payments[7]?.amount?.toLocaleString() || 0}</td><td>${s.payments[7]?.date || '-'}</td>
             </tr>
         </table>
-        <div style="font-size:13px; text-align:center; margin-top:15px; border-top:1px dashed #000; padding-top:10px;">ولي الأمر ملزم بدفع المبلغ كاملاً دون قطع أي مبلغ في حال النقل أو الترك</div>
+        <div style="font-size:12px; text-align:center; margin-top:10px; border-top:1px dashed #000; padding-top:5px;">ولي الأمر ملزم بدفع المبلغ كاملاً دون قطع أي مبلغ في حال النقل أو الترك</div>
     </div>`;
+
+    let html = `
+    <div style="display:flex; flex-direction:column; height:100vh; justify-content:space-around;">
+        ${generateHalf('نسخة المدرسة')}
+        <div class="receipt-divider" style="border-top:2px dashed #000; width:100%; margin:0;"></div>
+        ${generateHalf('نسخة الطالب')}
+    </div>`;
+
     document.getElementById('print-area').innerHTML = html;
     window.print();
 }
